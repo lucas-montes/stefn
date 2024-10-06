@@ -15,8 +15,6 @@ use jsonwebtoken::{
 };
 use serde::{Deserialize, Serialize};
 
-const SITE: &str = "elerem.com";
-
 pub struct Keys {
     encoding: EncodingKey,
     decoding: DecodingKey,
@@ -46,11 +44,11 @@ struct JWTClaims {
 }
 
 impl JWTClaims {
-    fn new(user_id: i64, user_role: &str) -> Self {
+    fn new(user_id: i64, user_role: &str, site: &str) -> Self {
         JWTClaims {
-            iss: SITE.to_owned(),
+            iss: site.to_owned(),
             sub: user_id.to_string(),
-            aud: SITE.to_owned(),
+            aud: site.to_owned(),
             exp: (Utc::now() + Duration::days(1)).timestamp(),
             iat: get_current_timestamp(),
             jti: String::new(),
@@ -62,7 +60,7 @@ impl JWTClaims {
 pub fn create_token(user_id: i64, user_role: &str, state: &AppState) -> Result<String, AppError> {
     encode(
         &Header::default(),
-        &JWTClaims::new(user_id, user_role),
+        &JWTClaims::new(user_id, user_role, &state.domain),
         &state.keys.encoding,
     )
     .map_err(AppError::JWTError)
@@ -87,8 +85,8 @@ pub async fn jwt_middleware(
     next: Next,
 ) -> Result<Response, AppError> {
     let mut validation = Validation::default();
-    validation.set_audience(&[SITE]);
-    validation.set_issuer(&[SITE]);
+    validation.set_audience(&[&state.domain]); // TODO: get it from config
+    validation.set_issuer(&[&state.domain]); // TODO: get it from config
     validation.leeway = 60 * 60 * 60 * 24 * 30; //TODO: keep at one hour instead of days
     validation.reject_tokens_expiring_in_less_than = 86400u64;
     validation.set_required_spec_claims(&["iss", "sub", "aud", "exp", "iat", "jti", "rol"]);

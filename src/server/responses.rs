@@ -66,12 +66,20 @@ pub enum AppError {
     //
     IpError(MaxMindDBError),
     IpDataNotFound,
+    //
+    Custom(StatusCode, String),
 }
 
 #[derive(Serialize, ToResponse, ToSchema)]
 pub struct ErrorMessage {
     #[schema(example = "Sorry no sorry, something wrong happened")]
     message: String,
+}
+
+impl AppError {
+    pub fn custom_internal(message: &str) -> Self {
+        Self::Custom(StatusCode::INTERNAL_SERVER_ERROR, message.to_owned())
+    }
 }
 
 // Tell axum how `AppError` should be converted into a response.
@@ -100,6 +108,8 @@ impl IntoResponse for AppError {
 
             AppError::IpError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             AppError::IpDataNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "Ip wrong".to_owned()),
+
+            AppError::Custom(status, message) => (status, message),
         };
 
         (status, Json(ErrorMessage { message })).into_response()

@@ -1,14 +1,11 @@
 use axum::{
-    extract::MatchedPath,
-    http::{HeaderValue, Request},
-    middleware::from_fn_with_state,
+    http::{HeaderValue, Request, StatusCode},
     response::{Html, IntoResponse, Response},
-    routing::get,
     Router,
 };
 use hyper::{
     header::{AUTHORIZATION, CONTENT_TYPE, COOKIE},
-    Method, StatusCode,
+    Method,
 };
 use std::{
     sync::{atomic::AtomicU64, Arc},
@@ -27,11 +24,14 @@ use tower_http::{
     },
     LatencyUnit, ServiceBuilderExt,
 };
-use tracing::{info_span, Level};
+use tracing::Level;
 
-use super::{AppState, Config};
+use super::Config;
 
-pub fn get_router(config: &Config, state: AppState, routes: Router<AppState>) -> Router<()> {
+pub fn get_router<S>(config: &Config, state: S, routes: Router<S>) -> Router<()>
+where
+    S: Send + Sync + Clone + 'static,
+{
     let sensitive_headers: Arc<[_]> = vec![AUTHORIZATION, COOKIE].into();
     // Build our middleware stack
     let middleware = ServiceBuilder::new()

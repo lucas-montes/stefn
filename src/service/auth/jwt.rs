@@ -1,5 +1,3 @@
-use super::{AppError, AppState};
-
 use axum::{
     extract::{Request, State},
     middleware::Next,
@@ -14,6 +12,8 @@ use jsonwebtoken::{
     decode, encode, get_current_timestamp, DecodingKey, EncodingKey, Header, Validation,
 };
 use serde::{Deserialize, Serialize};
+
+use crate::service::{AppError, AppState};
 
 pub struct Keys {
     encoding: EncodingKey,

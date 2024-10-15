@@ -7,11 +7,11 @@ use axum::{
 };
 use maxminddb::MaxMindDBError;
 use serde::{Deserialize, Serialize};
-use utoipa::{IntoParams, ToResponse, ToSchema};
+use utoipa::{ToResponse, ToSchema};
 
 pub type AppResult<T> = std::result::Result<Json<T>, AppError>;
 
-#[derive(Debug, Serialize, Deserialize, IntoParams)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedQuery<T> {
     #[serde(flatten)]
     query: T,
@@ -20,7 +20,7 @@ pub struct PaginatedQuery<T> {
     per_page: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToResponse, ToSchema)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PaginatedResponse<T> {
     data: Vec<T>,
     total_pages: i64,
@@ -80,11 +80,11 @@ impl AppError {
     pub fn custom_internal(message: &str) -> Self {
         Self::Custom(StatusCode::INTERNAL_SERVER_ERROR, message.to_owned())
     }
+    pub fn custom_bad_request(message: &str) -> Self {
+        Self::Custom(StatusCode::BAD_REQUEST, message.to_owned())
+    }
 }
 
-// Tell axum how `AppError` should be converted into a response.
-//
-// This is also a convenient place to log errors.
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         tracing::error!("{:?}", self);

@@ -5,21 +5,18 @@ use std::{
     net::{IpAddr, Ipv4Addr},
 };
 
-use super::{init_dev_tracing, init_prod_tracing};
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Env {
     Development,
     Production,
     Test,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ServiceConfig {
     pub env: Env,
     pub ip: IpAddr,
     pub port: u16,
-    pub threads: usize,
     pub max_upload_size: u64,
     pub domain_name: String,
     pub allowed_origins: AllowedOrigins,
@@ -28,16 +25,7 @@ pub struct Config {
     pub session_key: String,
 }
 
-impl Config {
-    pub fn init_tracing(self) -> Self {
-        match self.env {
-            Env::Development => init_dev_tracing(),
-            Env::Production => init_prod_tracing(),
-            Env::Test => (),
-        };
-        self
-    }
-
+impl ServiceConfig {
     pub fn from_file(file_name: &str) -> Self {
         serde_json::from_reader(File::open(file_name).expect("where is your config file?"))
             .expect("your config is wrong")
@@ -46,14 +34,13 @@ impl Config {
     pub fn stub() -> Self {
         Self {
             env: Env::Test,
-            threads: 1,
             ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             port: 8000,
             max_upload_size: 10485760,
-            domain_name: "elerem.com".to_owned(),
+            domain_name: "test.com".to_owned(),
             allowed_origins: AllowedOrigins::default(),
             ips_database: None,
-            database_url: "./database.sqlite".to_owned(),
+            database_url: "./test.sqlite".to_owned(),
             session_key: "session_key".to_owned(),
         }
     }

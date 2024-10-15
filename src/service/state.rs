@@ -1,7 +1,9 @@
-use super::{auth::Keys, config::Config};
+use super::config::ServiceConfig;
 use axum::extract::{FromRequestParts, State};
 use sqlx::SqlitePool;
 use std::{ops::Deref, sync::Arc};
+
+use crate::service::Keys;
 
 pub struct App {
     pub primary_database: SqlitePool,
@@ -11,7 +13,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(config: &ServiceConfig) -> Self {
         let ips_database = config.ips_database.as_ref().map(|f| {
             maxminddb::Reader::open_readfile(f)
                 .expect("the database for the ips seems to be missing or is the wrong path")
@@ -30,7 +32,7 @@ impl App {
 pub struct AppState(pub Arc<App>);
 
 impl AppState {
-    pub fn new(config: &Config) -> Self {
+    pub fn new(config: &ServiceConfig) -> Self {
         AppState(Arc::new(App::new(&config)))
     }
 }

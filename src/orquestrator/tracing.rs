@@ -1,11 +1,11 @@
 use tracing_subscriber::{fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt};
 
+//TODO: refactor. Create a better logging per service and global
 pub fn init_prod_tracing() {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "webservice=debug,tower_http=trace,axum::rejection=trace".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "tower_http=trace,axum::rejection=trace".into()),
         )
         .with(
             tracing_subscriber::fmt::layer()
@@ -27,9 +27,8 @@ pub fn init_prod_tracing() {
 pub fn init_dev_tracing() {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "webservice=debug,tower_http=trace,axum::rejection=trace".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "tower_http=trace,axum::rejection=trace".into()),
         )
         .with(
             tracing_subscriber::fmt::layer()

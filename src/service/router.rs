@@ -26,9 +26,9 @@ use tower_http::{
 };
 use tracing::Level;
 
-use super::Config;
+use super::ServiceConfig;
 
-pub fn get_router<S>(config: &Config, state: S, routes: Router<S>) -> Router<()>
+pub fn get_router<S>(config: &ServiceConfig, state: S, routes: Router<S>) -> Router<()>
 where
     S: Send + Sync + Clone + 'static,
 {
@@ -101,7 +101,7 @@ impl MakeRequestId for MyMakeRequestId {
     }
 }
 
-fn std_cors(config: &Config) -> CorsLayer {
+fn std_cors(config: &ServiceConfig) -> CorsLayer {
     CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([CONTENT_TYPE, AUTHORIZATION])

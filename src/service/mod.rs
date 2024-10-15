@@ -1,15 +1,16 @@
 mod auth;
 mod config;
+mod model;
 mod responses;
 mod router;
 mod state;
-mod tracing;
-
 mod versioning;
 
-pub use auth::{create_token, jwt_middleware, JWTUserRequest};
-pub use config::Config;
+pub use auth::{
+    create_token, hash_password, jwt_middleware, verify_password, JWTUserRequest, Keys,
+};
+pub use config::ServiceConfig;
+pub use model::Service;
 pub use responses::{AppError, AppJson, AppResult, ErrorMessage};
 pub use router::get_router;
 pub use state::{App, AppState};
-pub use tracing::{init_dev_tracing, init_prod_tracing};

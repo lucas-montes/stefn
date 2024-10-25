@@ -22,11 +22,13 @@ pub struct ServiceConfig {
     pub allowed_origins: AllowedOrigins,
     pub ips_database: Option<String>,
     pub database_url: String,
+    pub broker_url: String,
     pub session_key: String,
 }
 
 impl ServiceConfig {
     pub fn from_file(file_name: &str) -> Self {
+        //TODO: would be cool to read from an encrypted file
         serde_json::from_reader(File::open(file_name).expect("where is your config file?"))
             .expect("your config is wrong")
     }
@@ -40,6 +42,7 @@ impl ServiceConfig {
             domain_name: "test.com".to_owned(),
             allowed_origins: AllowedOrigins::default(),
             ips_database: None,
+            broker_url: "./test-broker.sqlite".to_owned(),
             database_url: "./test.sqlite".to_owned(),
             session_key: "session_key".to_owned(),
         }

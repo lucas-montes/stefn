@@ -28,7 +28,7 @@ pub fn init_dev_tracing() {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "tower_http=trace,axum::rejection=trace".into()),
+                .unwrap_or_else(|_| "stefn=debug".into()),
         )
         .with(
             tracing_subscriber::fmt::layer()

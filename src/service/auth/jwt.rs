@@ -30,7 +30,7 @@ impl Keys {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct JWTClaims {
+struct JWTClaims<T> {
     // Registered claims
     iss: String, // Issuer
     sub: String, // Subject
@@ -40,11 +40,12 @@ struct JWTClaims {
     jti: String, // JWT ID
 
     // Private claims
-    pub rol: String, // User's role TODO: use an enum
+    #[serde(flatten)]
+    private: T,
 }
 
-impl JWTClaims {
-    fn new(user_id: i64, user_role: &str, site: &str) -> Self {
+impl<T> JWTClaims<T> {
+    fn new(user_id: i64, site: &str, private: T) -> Self {
         JWTClaims {
             iss: site.to_owned(),
             sub: user_id.to_string(),
@@ -52,7 +53,7 @@ impl JWTClaims {
             exp: (Utc::now() + Duration::days(1)).timestamp(),
             iat: get_current_timestamp(),
             jti: String::new(),
-            rol: user_role.to_owned(),
+            private,
         }
     }
 }
@@ -60,25 +61,21 @@ impl JWTClaims {
 pub fn create_token(user_id: i64, user_role: &str, state: &AppState) -> Result<String, AppError> {
     encode(
         &Header::default(),
-        &JWTClaims::new(user_id, user_role, &state.domain),
+        &JWTClaims::new(user_id, &state.domain, user_role),
         &state.keys.encoding,
     )
     .map_err(AppError::JWTError)
 }
 
 #[derive(Clone)]
-pub struct JWTUserRequest {
+pub struct JWTUserRequest<T> {
     pub id: i64,
-    role: String,
+    private: T,
 }
 
-impl JWTUserRequest {
-    pub fn is_authorized(&self, role: &str) -> bool {
-        self.role.eq(role)
-    }
-}
-
-pub async fn jwt_middleware(
+pub async fn jwt_middleware<
+    T: for<'a> Deserialize<'a> + std::marker::Send + std::marker::Sync + Clone + 'static,
+>(
     State(state): State<AppState>,
     TypedHeader(bearer): TypedHeader<Authorization<Bearer>>,
     mut request: Request,
@@ -89,9 +86,9 @@ pub async fn jwt_middleware(
     validation.set_issuer(&[&state.domain]); // TODO: get it from config
     validation.leeway = 60 * 60 * 60 * 24 * 30; //TODO: keep at one hour instead of days
     validation.reject_tokens_expiring_in_less_than = 86400u64;
-    validation.set_required_spec_claims(&["iss", "sub", "aud", "exp", "iat", "jti", "rol"]);
+    validation.set_required_spec_claims(&["iss", "sub", "aud", "exp", "iat", "jti", "private"]);
 
-    let token_data = decode::<JWTClaims>(bearer.token(), &state.keys.decoding, &validation)
+    let token_data = decode::<JWTClaims<T>>(bearer.token(), &state.keys.decoding, &validation)
         .map_err(AppError::JWTError)?;
 
     request.extensions_mut().insert(JWTUserRequest {
@@ -100,7 +97,7 @@ pub async fn jwt_middleware(
             .sub
             .parse::<i64>()
             .map_err(AppError::JWTModified)?,
-        role: token_data.claims.rol,
+        private: token_data.claims.private.clone(),
     });
 
     Ok(next.run(request).await)

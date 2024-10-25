@@ -1,13 +1,15 @@
+use menva::read_default_file;
 use tokio::task::JoinSet;
 
-use crate::service::Service;
+use crate::service::{Service, Services};
 
 use super::tracing::{init_dev_tracing, init_prod_tracing};
 
 pub struct ServicesOrquestrator {
     max_blocking_threads: usize,
     worker_threads: usize,
-    services: Vec<Service>,
+    services: Vec<Services>,
+    run_migrations: bool,
 }
 
 impl ServicesOrquestrator {
@@ -16,7 +18,17 @@ impl ServicesOrquestrator {
             worker_threads,
             max_blocking_threads,
             services: Vec::new(),
+            run_migrations: false,
         }
+    }
+    pub fn load_environment_variables(self) -> Self {
+        read_default_file();
+        self
+    }
+
+    pub fn run_migrations(mut self) -> Self {
+        self.run_migrations = true;
+        self
     }
 
     pub fn init_dev_tracing(self) -> Self {
@@ -29,19 +41,23 @@ impl ServicesOrquestrator {
         self
     }
 
-    pub fn add_service(mut self, service: Service) -> Self {
+    pub fn add_service(mut self, service: Services) -> Self {
         self.services.push(service);
         self
     }
 
-    async fn start_services(&self) {
+    async fn start_services(self) -> Vec<Result<(), std::io::Error>> {
         let mut set = JoinSet::new();
 
-        for service in self.services.clone() {
+        for mut service in self.services {
+            service.set_up();
+            if self.run_migrations {
+                service.run_migrations().await;
+            }
             set.spawn(async move { service.run().await });
         }
 
-        let output = set.join_all().await;
+        set.join_all().await
     }
 
     pub fn run(self) {

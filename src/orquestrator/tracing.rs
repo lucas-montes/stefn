@@ -26,10 +26,7 @@ pub fn init_prod_tracing() {
 
 pub fn init_dev_tracing() {
     tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "stefn=debug".into()),
-        )
+        .with(tracing_subscriber::EnvFilter::from_default_env())
         .with(
             tracing_subscriber::fmt::layer()
                 .json()

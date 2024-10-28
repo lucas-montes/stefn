@@ -26,9 +26,9 @@ use tower_http::{
 };
 use tracing::Level;
 
-use super::ServiceConfig;
+use super::Config;
 
-pub fn get_router<S>(config: &ServiceConfig, state: S, routes: Router<S>) -> Router<()>
+pub fn get_router<S>(config: &Config, state: S, routes: Router<S>) -> Router<()>
 where
     S: Send + Sync + Clone + 'static,
 {
@@ -44,15 +44,7 @@ where
         // Add high level tracing/logging to all requests
         .layer(
             TraceLayer::new_for_http()
-                .on_request(|request: &Request<_>, _span: &tracing::Span| {
-                    // Log the request with path, method, and any payload
-                    tracing::info!(
-                        method = %request.method(),
-                        path = %request.uri().path(),
-                        payload = ?request.body(),
-                        "received request"
-                    );
-                })
+                .on_request(DefaultOnRequest::new())
                 .on_response(
                     DefaultOnResponse::new()
                         .level(Level::INFO)
@@ -101,7 +93,7 @@ impl MakeRequestId for MyMakeRequestId {
     }
 }
 
-fn std_cors(config: &ServiceConfig) -> CorsLayer {
+fn std_cors(config: &Config) -> CorsLayer {
     CorsLayer::new()
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([CONTENT_TYPE, AUTHORIZATION])

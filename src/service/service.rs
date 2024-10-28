@@ -4,7 +4,7 @@ use sqlx::migrate::Migrator;
 use std::net::SocketAddr;
 use tokio::{net::TcpListener, signal};
 
-use super::{get_router, AppState, ServiceConfig};
+use super::{get_router, AppState, Config};
 
 pub enum Services {
     Background(BackgroundService),
@@ -12,7 +12,7 @@ pub enum Services {
 }
 
 pub struct BackgroundService {
-    config: ServiceConfig,
+    config: Config,
     task: Box<dyn Fn() -> BoxFuture<'static, Result<(), std::io::Error>> + Send>,
 }
 
@@ -22,7 +22,7 @@ impl BackgroundService {
         task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>,
     ) -> Self {
         Self {
-            config: ServiceConfig::from_file(config_path),
+            config: Config::from_file(config_path),
             task: Box::new(task),
         }
     }
@@ -31,7 +31,7 @@ impl BackgroundService {
 impl Service for BackgroundService {
     fn stub(self) -> Self {
         Self {
-            config: ServiceConfig::stub(),
+            config: Config::stub(),
             task: self.task,
         }
     }
@@ -42,11 +42,8 @@ impl Service for BackgroundService {
 }
 
 impl Services {
-    pub fn new_http_service(
-        config_path: &str,
-        router_factory: fn(AppState) -> Router<AppState>,
-    ) -> Self {
-        Self::Http(HttpService::new(config_path, router_factory))
+    pub fn new_http_service(router_factory: fn(AppState) -> Router<AppState>) -> Self {
+        Self::Http(HttpService::new(router_factory))
     }
 
     pub fn new_background_service(
@@ -92,15 +89,15 @@ impl Service for Services {
 }
 
 pub struct HttpService {
-    config: ServiceConfig,
+    config: Config,
     state: Option<AppState>,
     router_factory: fn(AppState) -> Router<AppState>,
 }
 
 impl HttpService {
-    pub fn new(config_path: &str, router_factory: fn(AppState) -> Router<AppState>) -> Self {
+    pub fn new(router_factory: fn(AppState) -> Router<AppState>) -> Self {
         Self {
-            config: ServiceConfig::from_file(config_path),
+            config: Config::from_env(),
             state: None,
             router_factory,
         }
@@ -118,8 +115,8 @@ impl HttpService {
 
 impl Service for HttpService {
     fn stub(self) -> Self {
-        let config = ServiceConfig::stub();
-        let state: AppState = AppState::new(&config);
+        let config = Config::stub();
+        let state: AppState = AppState::new(config.clone());
         Self {
             config,
             state: Some(state),
@@ -128,15 +125,13 @@ impl Service for HttpService {
     }
 
     fn set_up(&mut self) {
-        let state = AppState::new(&self.config);
+        let state = AppState::new(self.config.clone());
         self.state = Some(state.clone());
     }
 
     async fn run(self) -> Result<(), std::io::Error> {
         let router = self.router();
-        let addr = TcpListener::bind((self.config.ip, self.config.port))
-            .await
-            .unwrap();
+        let addr = TcpListener::bind(self.config.socket_addr()).await.unwrap();
         axum::serve(
             addr,
             router.into_make_service_with_connect_info::<SocketAddr>(),
@@ -172,7 +167,7 @@ pub trait Service {
     }
 }
 
-async fn shutdown_signal() {
+pub async fn shutdown_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
             .await

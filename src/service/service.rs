@@ -142,12 +142,7 @@ impl Service for HttpService {
 
     async fn run_migrations(&self) {
         let state = self.state.as_ref().unwrap();
-        Migrator::new(std::path::Path::new("./migrations/principal"))
-            .await
-            .expect("Where are the migrations?")
-            .run(&state.primary_database)
-            .await
-            .expect("Migrations failed");
+        // state.primary_database.run_migrations().await;
 
         Migrator::new(std::path::Path::new("./migrations/events"))
             .await

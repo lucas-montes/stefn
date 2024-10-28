@@ -1,5 +1,6 @@
 mod auth;
 mod broker;
+mod database;
 mod orquestrator;
 mod service;
 

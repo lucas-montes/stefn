@@ -22,7 +22,7 @@ pub async fn jwt_middleware<
     next: Next,
 ) -> Result<Response, AppError> {
     let user =
-        get_user_from_valid_token::<T>(&state.domain(), &state.keys.decoding, bearer.token())?;
+        get_user_from_valid_token::<T>(state.domain(), &state.keys.decoding, bearer.token())?;
     request.extensions_mut().insert(user);
 
     Ok(next.run(request).await)

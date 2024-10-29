@@ -18,11 +18,11 @@ pub struct BackgroundService {
 
 impl BackgroundService {
     pub fn new(
-        config_path: &str,
+        env_prefix: &str,
         task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>,
     ) -> Self {
         Self {
-            config: Config::from_file(config_path),
+            config: Config::from_env(env_prefix),
             task: Box::new(task),
         }
     }
@@ -42,15 +42,18 @@ impl Service for BackgroundService {
 }
 
 impl Services {
-    pub fn new_http_service(router_factory: fn(AppState) -> Router<AppState>) -> Self {
-        Self::Http(HttpService::new(router_factory))
+    pub fn new_http_service(
+        env_prefix: &str,
+        router_factory: fn(AppState) -> Router<AppState>,
+    ) -> Self {
+        Self::Http(HttpService::new(env_prefix, router_factory))
     }
 
     pub fn new_background_service(
-        config_path: &str,
+        env_prefix: &str,
         task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>,
     ) -> Self {
-        Self::Background(BackgroundService::new(config_path, task))
+        Self::Background(BackgroundService::new(env_prefix, task))
     }
 
     pub fn router(&self) -> Option<Router> {
@@ -95,9 +98,9 @@ pub struct HttpService {
 }
 
 impl HttpService {
-    pub fn new(router_factory: fn(AppState) -> Router<AppState>) -> Self {
+    pub fn new(env_prefix: &str, router_factory: fn(AppState) -> Router<AppState>) -> Self {
         Self {
-            config: Config::from_env(),
+            config: Config::from_env(env_prefix),
             state: None,
             router_factory,
         }
@@ -142,7 +145,7 @@ impl Service for HttpService {
 
     async fn run_migrations(&self) {
         let state = self.state.as_ref().unwrap();
-        // state.primary_database.run_migrations().await;
+        state.primary_database.run_migrations().await;
 
         Migrator::new(std::path::Path::new("./migrations/events"))
             .await

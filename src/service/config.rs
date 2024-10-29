@@ -1,9 +1,8 @@
 use axum::http::HeaderValue;
 use menva::FromEnv;
-use serde::{Deserialize, Serialize};
-use std::{fs::File, str::FromStr};
+use std::{net::Ipv4Addr, str::FromStr};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
 pub enum Env {
     Development,
     Production,
@@ -23,44 +22,49 @@ impl FromStr for Env {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, FromEnv)]
-pub struct Config {
-    pub env: Env,
-    ip: String,
-    port: u16,
-    pub max_upload_size: u64,
-    pub domain: String,
-    allowed_origins: String,
-    pub ips_database_url: String,
-    pub database_url: String,
-    pub broker_url: String,
-    pub session_key: String,
+#[derive(Debug, Clone, FromEnv)]
+pub struct SharedConfig {
+    env: Env,
+    max_upload_size: u64,
+    ips_database_url: String,
+    database_url: String,
+    broker_url: String,
 }
 
-impl Config {
-    pub fn from_file(file_name: &str) -> Self {
-        //TODO: would be cool to read from an encrypted file
-        serde_json::from_reader(File::open(file_name).expect("where is your config file?"))
-            .expect("your config is wrong")
-    }
-
+impl SharedConfig {
     pub fn stub() -> Self {
         Self {
             env: Env::Test,
-            ip: "127.0.0.1".into(),
-            port: 8000,
             max_upload_size: 10485760,
-            domain: "test.com".into(),
-            allowed_origins: "*".into(),
             ips_database_url: "".into(),
             broker_url: "./test-broker.sqlite".to_owned(),
             database_url: "./test.sqlite".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, FromEnv)]
+pub struct ServiceConfig {
+    ip: Ipv4Addr,
+    port: u16,
+    domain: String,
+    allowed_origins: String,
+    session_key: String,
+}
+
+impl ServiceConfig {
+    pub fn stub() -> Self {
+        Self {
+            ip: Ipv4Addr::new(0, 0, 0, 0),
+            port: 8000,
+            domain: "test.com".into(),
+            allowed_origins: "*".into(),
             session_key: "session_key".to_owned(),
         }
     }
 
-    pub fn socket_addr(&self) -> (&str, u16) {
-        (&self.ip, self.port)
+    pub fn socket_addr(&self) -> (Ipv4Addr, u16) {
+        (self.ip, self.port)
     }
 
     pub fn allowed_origins(&self) -> AllowedOrigins {
@@ -68,7 +72,53 @@ impl Config {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone)]
+pub struct Config {
+    service: ServiceConfig,
+    shared: SharedConfig,
+}
+
+impl Config {
+    pub fn session_key(&self) -> &[u8] {
+        &self.service.session_key.as_bytes()
+    }
+    pub fn database_url(&self) -> &str {
+        &self.shared.database_url
+    }
+    pub fn ips_database_url(&self) -> &str {
+        &self.shared.ips_database_url
+    }
+    pub fn broker_url(&self) -> &str {
+        &self.shared.broker_url
+    }
+    pub fn domain(&self) -> &str {
+        &self.service.domain
+    }
+
+    pub fn from_env(prefix: &str) -> Self {
+        Self {
+            service: ServiceConfig::from_env_with_prefix(prefix),
+            shared: SharedConfig::from_env(),
+        }
+    }
+
+    pub fn stub() -> Self {
+        Self {
+            service: ServiceConfig::stub(),
+            shared: SharedConfig::stub(),
+        }
+    }
+
+    pub fn socket_addr(&self) -> (Ipv4Addr, u16) {
+        self.service.socket_addr()
+    }
+
+    pub fn allowed_origins(&self) -> AllowedOrigins {
+        self.service.allowed_origins()
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 pub struct AllowedOrigins(Vec<String>);
 
 impl AllowedOrigins {

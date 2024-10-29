@@ -1,39 +1,34 @@
 use super::config::Config;
 use axum::extract::{FromRequestParts, State};
-use sqlx::{sqlite::SqliteConnectOptions, SqlitePool};
-use std::{ops::Deref, str::FromStr, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
-use crate::{auth::Keys, broker::Broker};
+use crate::{
+    auth::Keys,
+    broker::Broker,
+    database::{Database, IpsDatabase},
+};
 
 pub struct App {
-    pub primary_database: SqlitePool,
+    pub primary_database: Database,
     pub events_broker: Broker,
-    pub ips_database: Option<maxminddb::Reader<Vec<u8>>>,
+    pub ips_database: IpsDatabase,
     pub keys: Keys,
     pub config: Config,
 }
 
 impl App {
     pub fn new(config: Config) -> Self {
-        let ips_database = if config.ips_database_url.is_empty() {
-            None
-        } else {
-            Some(
-                maxminddb::Reader::open_readfile(&config.ips_database_url)
-                    .expect("the database for the ips seems to be missing or is the wrong path"),
-            )
-        };
-
-        let database_config = SqliteConnectOptions::from_str(&config.database_url)
-            .expect("Cannot connect to database")
-            .create_if_missing(true);
         Self {
-            keys: Keys::new(config.session_key.as_bytes()),
-            primary_database: SqlitePool::connect_lazy_with(database_config),
-            ips_database,
-            events_broker: Broker::new(&config.broker_url),
+            keys: Keys::new(config.session_key()),
+            primary_database: Database::new(&config.database_url()),
+            ips_database: IpsDatabase::new(&config.ips_database_url()),
+            events_broker: Broker::new(&config.broker_url()),
             config,
         }
+    }
+
+    pub fn domain(&self) -> &str {
+        &self.config.domain()
     }
 }
 

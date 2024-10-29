@@ -25,6 +25,10 @@ impl Database {
             .await
             .expect("Migrations failed");
     }
+
+    pub async fn get_connection(&self) -> &SqlitePool {
+        &self.storage
+    }
 }
 
 pub struct IpsDatabase {

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::service::AppError;
 
 #[derive(Clone)]
-pub struct JWTUserRequest<T> {
+pub struct JWTUserRequest<T: Clone> {
     pub id: i64,
     private: T,
 }
@@ -19,6 +19,7 @@ impl<T: Clone> JWTUserRequest<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct Keys {
     pub encoding: EncodingKey,
     pub decoding: DecodingKey,

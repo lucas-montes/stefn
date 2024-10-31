@@ -26,9 +26,9 @@ use tower_http::{
 };
 use tracing::Level;
 
-use super::Config;
+use crate::config::ServiceConfig;
 
-pub fn get_router<S>(config: &Config, state: S, routes: Router<S>) -> Router<()>
+pub fn get_router<S>(state: S, routes: Router<S>) -> Router
 where
     S: Send + Sync + Clone + 'static,
 {
@@ -65,8 +65,7 @@ where
         .insert_response_header_if_not_present(
             CONTENT_TYPE,
             HeaderValue::from_static("application/octet-stream"),
-        )
-        .layer(std_cors(config));
+        );
 
     Router::new()
         .nest("/", routes)
@@ -91,13 +90,6 @@ impl MakeRequestId for MyMakeRequestId {
             .ok()
             .map(|r| RequestId::new(r))
     }
-}
-
-fn std_cors(config: &Config) -> CorsLayer {
-    CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers([CONTENT_TYPE, AUTHORIZATION])
-        .allow_origin(Any)
 }
 
 async fn error_404() -> Response {

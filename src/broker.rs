@@ -1,4 +1,5 @@
 use sqlx::{
+    migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
     QueryBuilder, Sqlite, SqlitePool,
 };
@@ -6,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::AppError;
 
+#[derive(Clone)]
 pub struct Broker {
     storage: SqlitePool,
 }
@@ -22,6 +24,16 @@ impl Broker {
             storage: SqlitePool::connect_lazy_with(events_config),
         }
     }
+
+    pub async fn run_migrations(&self) {
+        Migrator::new(std::path::Path::new("./migrations/events"))
+            .await
+            .expect("Where are the migrations?")
+            .run(&self.storage)
+            .await
+            .expect("Migrations failed");
+    }
+
     pub async fn send_events<S, C>(&self, events: EventFactory<S, C>) -> Result<u64, AppError>
     where
         C: Clone + sqlx::Type<sqlx::Sqlite> + sqlx::Encode<'static, sqlx::Sqlite> + 'static,

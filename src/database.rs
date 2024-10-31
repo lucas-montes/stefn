@@ -1,7 +1,8 @@
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, SqlitePool};
 
+#[derive(Clone)]
 pub struct Database {
     storage: SqlitePool,
 }
@@ -31,8 +32,9 @@ impl Database {
     }
 }
 
+#[derive(Clone)]
 pub struct IpsDatabase {
-    storage: Option<maxminddb::Reader<Vec<u8>>>,
+    storage: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
 }
 
 impl IpsDatabase {
@@ -40,10 +42,9 @@ impl IpsDatabase {
         let storage = if url.is_empty() {
             None
         } else {
-            Some(
-                maxminddb::Reader::open_readfile(url)
-                    .expect("the database for the ips seems to be missing or is the wrong path"),
-            )
+            Some(Arc::new(maxminddb::Reader::open_readfile(url).expect(
+                "the database for the ips seems to be missing or is the wrong path",
+            )))
         };
         Self { storage }
     }

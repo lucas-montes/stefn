@@ -6,11 +6,30 @@ use sha2::Sha256;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, SqlitePool};
 use std::{
     str::FromStr,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
+
+#[derive(Clone)]
+pub struct Session(Arc<RwLock<UserSession>>);
+
+impl Session {
+    pub async fn is_authenticated(&self) -> bool {
+        self.0.read().await.user_pk.is_some()
+    }
+
+    pub async fn id(&self) -> String {
+        self.0.read().await.session_id.to_owned()
+    }
+
+    pub async fn csrf_token(&self) -> String {
+        self.0.read().await.csrf_token.to_owned()
+    }
+}
 
 #[derive(Clone)]
 pub struct Sessions(SqlitePool);
@@ -38,28 +57,64 @@ impl Sessions {
     }
 
     pub async fn find_session(&self, session_id: &str) -> Result<Option<Session>, AppError> {
-        Session::from_session_id(session_id, self.get_connection()).await
+        UserSession::from_session_id(session_id, self.get_connection())
+            .await
+            .map(|u| u.map(|u| Session(Arc::new(RwLock::new(u)))))
     }
 
     pub async fn create_session(
         &self,
-        user_pk: i64,
+        user_pk: Option<i64>,
         groups: String,
         session_expiration: u64,
 
         country: &str,
     ) -> Result<Session, AppError> {
-        let session = Session::new(user_pk, groups, country, session_expiration);
+        let session = UserSession::new(user_pk, groups, country, session_expiration);
 
         session.save(self.get_connection()).await?;
+        Ok(Session(Arc::new(RwLock::new(session))))
+    }
+
+    pub async fn update_session(
+        &self,
+        session: Session,
+        secret: &str,
+    ) -> Result<Session, AppError> {
+        session
+            .0
+            .write()
+            .await
+            .update_last_accessed()
+            .update_csrf_token(secret)
+            .update(self.get_connection())
+            .await?;
+
         Ok(session)
+    }
+
+    pub async fn reuse_current_as_new_one(
+        &self,
+        session: Session,
+        user_pk: i64,
+        groups: String,
+    ) -> Result<(), AppError> {
+        session
+            .0
+            .write()
+            .await
+            .new_session_id()
+            .update_user(user_pk, groups)
+            .save(self.get_connection())
+            .await?;
+        Ok(())
     }
 }
 
-#[derive(Deserialize, sqlx::FromRow, Clone)]
-pub struct Session {
-    session_id: Uuid,
-    user_pk: i64,
+#[derive(Debug, Deserialize, sqlx::FromRow, Clone)]
+pub struct UserSession {
+    session_id: String,
+    user_pk: Option<i64>,
     groups: String,
     last_accessed: NaiveDateTime,
     expiration: NaiveDateTime,
@@ -68,22 +123,16 @@ pub struct Session {
     country: String,
 }
 
-impl Session {
-    pub fn id(&self) -> &Uuid {
-        &self.session_id
-    }
-
-    pub fn expiration_offset(&self) {}
-
-    fn new(user_pk: i64, groups: String, country: &str, session_expiration: u64) -> Self {
+impl UserSession {
+    fn new(user_pk: Option<i64>, groups: String, country: &str, session_expiration: u64) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
         let today = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
-        let expiration = today + Days::new(60 * 60 * 24 * session_expiration);
-        Session {
-            session_id: Uuid::now_v7(),
+        let expiration = today + Days::new(session_expiration);
+        Self {
+            session_id: Uuid::now_v7().to_string(),
             user_pk,
             groups,
             last_accessed: today,
@@ -96,13 +145,33 @@ impl Session {
 
     fn get_token_data(&self) -> String {
         format!(
-            "{}-{}-{}-{}",
-            self.session_id, self.user_pk, self.country, self.last_accessed
+            "{}-{}-{}",
+            self.session_id, self.country, self.last_accessed
         )
     }
 
-    pub fn new_csrf_token(mut self, secret: &str) -> Self {
+    fn new_session_id(&mut self) -> &mut Self {
+        self.session_id = Uuid::now_v7().to_string();
+        self
+    }
+
+    fn update_user(&mut self, user_pk: i64, groups: String) -> &mut Self {
+        self.user_pk = Some(user_pk);
+        self.groups = groups;
+        self
+    }
+
+    fn update_csrf_token(&mut self, secret: &str) -> &mut Self {
         self.csrf_token = generate_token(secret, &self.get_token_data());
+        self
+    }
+
+    fn update_last_accessed(&mut self) -> &mut Self {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+        self.last_accessed = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
         self
     }
 
@@ -119,8 +188,8 @@ impl Session {
     async fn from_session_id(
         session_id: &str,
         conn: &SqlitePool,
-    ) -> Result<Option<Session>, AppError> {
-        sqlx::query_as("SELECT * FROM web_sessions WHERE pk = $1")
+    ) -> Result<Option<Self>, AppError> {
+        sqlx::query_as("SELECT * FROM web_sessions WHERE session_id = $1;")
             .bind(session_id)
             .fetch_optional(conn)
             .await
@@ -128,8 +197,8 @@ impl Session {
     }
 
     async fn save(&self, conn: &SqlitePool) -> Result<i64, AppError> {
-        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, expiration, csrf_token, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
-            .bind(self.session_id)
+        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, expiration, csrf_token, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);")
+            .bind(&self.session_id)
             .bind(self.user_pk)
             .bind(&self.groups)
             .bind(self.last_accessed)
@@ -141,6 +210,19 @@ impl Session {
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))
             .map(|r|r.last_insert_rowid())
+    }
+
+    async fn update(&self, conn: &SqlitePool) -> Result<i64, AppError> {
+        sqlx::query(
+            "UPDATE web_sessions SET last_accessed = $1, csrf_token = $2 WHERE session_id = $3;",
+        )
+        .bind(self.last_accessed)
+        .bind(&self.csrf_token)
+        .bind(&self.session_id)
+        .execute(conn)
+        .await
+        .map_err(|e| AppError::custom_internal(&e.to_string()))
+        .map(|r| r.last_insert_rowid())
     }
 }
 

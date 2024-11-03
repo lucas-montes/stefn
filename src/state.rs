@@ -24,6 +24,7 @@ impl SharedState {
             events_broker: Broker::new(&config.broker_url),
         }
     }
+
     pub fn database(&self) -> &Database {
         &self.database
     }
@@ -52,10 +53,23 @@ impl WebsiteState {
         }
     }
 
-    pub async fn find_session<T>(&self, session_id: &str) {}
+    pub fn events_broker(&self) -> &Broker {
+        &self.shared.events_broker
+    }
+    pub fn ips_database(&self) -> &IpsDatabase {
+        &self.shared.ips_database
+    }
 
-    pub fn get_session_cookie_name(&self) -> &str {
-        &self.secrets.session_cookie_name
+    pub fn config(&self) -> &WebsiteConfig {
+        &self.secrets
+    }
+
+    pub fn sessions(&self) -> &Sessions {
+        &self.sessions
+    }
+
+    pub fn database(&self) -> &Database {
+        &self.shared.database
     }
 }
 
@@ -86,6 +100,13 @@ impl APIState {
             shared,
             secrets,
         }
+    }
+
+    pub fn events_broker(&self) -> &Broker {
+        &self.shared.events_broker
+    }
+    pub fn ips_database(&self) -> &IpsDatabase {
+        &self.shared.ips_database
     }
 
     pub fn database(&self) -> &Database {

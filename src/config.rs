@@ -57,6 +57,8 @@ pub struct WebsiteConfig {
     pub sessions_db: String,
     pub session_cookie_name: String,
     pub session_expiration: i64,
+    pub login_redirect_to: String,
+    pub csrf_cookie_name: String,
 }
 
 impl ServiceConfig for WebsiteConfig {
@@ -69,7 +71,9 @@ impl ServiceConfig for WebsiteConfig {
             session_key: "session_key".to_owned(),
             sessions_db: "./test-sessions.sqlite".to_owned(),
             session_cookie_name: "session_id".to_owned(),
+            csrf_cookie_name: "csrf_token".to_owned(),
             session_expiration: 30,
+            login_redirect_to: "admin".to_owned(),
         }
     }
 

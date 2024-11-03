@@ -1,6 +1,5 @@
 use axum::Router;
 use futures::future::BoxFuture;
-
 use std::net::SocketAddr;
 use tokio::{net::TcpListener, signal};
 
@@ -37,8 +36,9 @@ impl ServiceExt for WebsiteService {
         }
     }
 
-    fn set_up(&mut self, shared: SharedState) {
+    async fn set_up(&mut self, shared: SharedState) {
         let state = WebsiteState::new(self.config.clone(), shared);
+        state.sessions().run_migrations().await;
         let routes = (self.router_factory)(state.clone());
         let router = get_router(state, routes);
         self.router = Some(router);
@@ -82,7 +82,7 @@ impl ServiceExt for APIService {
         }
     }
 
-    fn set_up(&mut self, shared: SharedState) {
+    async fn set_up(&mut self, shared: SharedState) {
         let state = APIState::new(self.config.clone(), shared);
         let routes = (self.router_factory)(state.clone());
         let router = get_router(state, routes);
@@ -141,11 +141,11 @@ impl ServiceExt for Service {
             Self::Website(s) => Self::Website(s.stub()),
         }
     }
-    fn set_up(&mut self, shared: SharedState) {
+    async fn set_up(&mut self, shared: SharedState) {
         match self {
-            Self::Background(s) => s.set_up(shared),
-            Self::API(s) => s.set_up(shared),
-            Self::Website(s) => s.set_up(shared),
+            Self::Background(s) => s.set_up(shared).await,
+            Self::API(s) => s.set_up(shared).await,
+            Self::Website(s) => s.set_up(shared).await,
         }
     }
     async fn run(self) -> Result<(), std::io::Error> {
@@ -187,7 +187,9 @@ impl ServiceExt for BackgroundService {
 
 pub trait ServiceExt {
     fn stub(self) -> Self;
-    fn set_up(&mut self, shared: SharedState) {}
+    fn set_up(&mut self, shared: SharedState) -> impl std::future::Future<Output = ()> {
+        async {}
+    }
     fn run(self) -> impl std::future::Future<Output = Result<(), std::io::Error>>;
 }
 

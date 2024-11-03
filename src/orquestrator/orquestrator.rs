@@ -77,7 +77,7 @@ impl ServicesOrquestrator {
         }
 
         for mut service in self.services {
-            service.set_up(state.clone());
+            service.set_up(state.clone()).await;
 
             set.spawn(async move { service.run().await });
         }

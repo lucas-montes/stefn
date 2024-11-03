@@ -1,26 +1,85 @@
+use std::net::SocketAddr;
+
 use axum::{
-    extract::{Request, State},
+    extract::{ConnectInfo, Request, State},
+    http::{header::SET_COOKIE, HeaderValue},
     middleware::Next,
     response::{IntoResponse, Redirect, Response},
 };
 use axum_extra::{headers::Cookie, TypedHeader};
+use cookie::time::Duration;
 
-use crate::{config::APIConfig, sessions::Sessions, AppError};
+use crate::{
+    config::{ServiceConfig, WebsiteConfig},
+    sessions::Sessions,
+    AppError, WebsiteState,
+};
+
+use super::services::set_session_cookies;
 
 pub async fn login_required_middleware(
     State(sessions): State<Sessions>,
-    State(config): State<APIConfig>,
+    State(config): State<WebsiteConfig>,
     TypedHeader(cookie): TypedHeader<Cookie>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
     //TODO: validate that the cookie is correct with hmac
+
     if let Some(session_id) = cookie.get(&config.session_cookie_name) {
         if let Some(session) = sessions.find_session(session_id).await? {
-            request.extensions_mut().insert(session);
-            return Ok(next.run(request).await);
+            if session.is_authenticated().await {
+                request.extensions_mut().insert(session);
+                return Ok(next.run(request).await);
+            }
         }
     }
-    let next = format!("login?next={}?oupsi=1&doupsi=2", request.uri());
+    let next = format!("login?next={}", request.uri());
     Ok(Redirect::to(&next).into_response())
+}
+
+pub async fn sessions_middleware(
+    state: State<WebsiteState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    TypedHeader(cookie): TypedHeader<Cookie>,
+    mut request: Request,
+    next: Next,
+) -> Result<Response, AppError> {
+    let sessions = state.sessions();
+    let config = state.config();
+
+    let current_session = match cookie.get(&config.session_cookie_name) {
+        Some(session_id) => sessions.find_session(session_id).await?,
+        None => None,
+    };
+
+    let session = match current_session {
+        Some(session) => session,
+        None => {
+            let country = state.ips_database().get_country_code_from_ip(addr)?;
+            let config = state.config();
+            let sessions = state.sessions();
+
+            sessions
+                .create_session(
+                    None,
+                    String::new(),
+                    config.session_expiration as u64,
+                    country,
+                )
+                .await?
+        }
+    };
+
+    request.extensions_mut().insert(session.clone());
+    //Before the response
+    let mut resp = next.run(request).await;
+    //After the response
+    let session = sessions
+        .update_session(session, &config.session_key)
+        .await?;
+
+    set_session_cookies(resp.headers_mut(), &session, config).await?;
+
+    Ok(resp)
 }

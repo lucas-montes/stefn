@@ -9,7 +9,7 @@ mod state;
 
 pub use auth::{
     create_token, hash_password, jwt_middleware, login_required_middleware, login_user,
-    verify_password, JWTUserRequest,
+    sessions_middleware, verify_password, JWTUserRequest,
 };
 pub use broker::{Broker, Event, EventFactory, EventMetadata};
 pub use database::{Database, IpsDatabase};

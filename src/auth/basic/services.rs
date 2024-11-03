@@ -2,8 +2,15 @@ use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
+use axum::http::{header::SET_COOKIE, HeaderValue};
+use cookie::time::Duration;
+use hyper::HeaderMap;
 
-use crate::AppError;
+use crate::{
+    config::{ServiceConfig, WebsiteConfig},
+    sessions::{Session, Sessions},
+    AppError, WebsiteState,
+};
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
@@ -18,4 +25,39 @@ pub fn verify_password(raw_password: &str, db_password: &str) -> Result<(), AppE
     Argon2::default()
         .verify_password(raw_password.as_bytes(), &parsed_hash)
         .map_err(AppError::WrongPassword)
+}
+
+pub async fn set_session_cookies(
+    headers: &mut HeaderMap<HeaderValue>,
+    session: &Session,
+    config: &WebsiteConfig,
+) -> Result<(), AppError> {
+    let cookie = cookie::Cookie::build((&config.csrf_cookie_name, session.csrf_token().await))
+        .domain(config.domain())
+        .path("/")
+        .max_age(Duration::days(config.session_expiration))
+        .secure(true)
+        .http_only(true)
+        .build();
+
+    headers.insert(
+        SET_COOKIE,
+        HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
+            .map_err(|e| AppError::custom_internal(&e.to_string()))?,
+    );
+
+    let cookie = cookie::Cookie::build((&config.session_cookie_name, session.id().await))
+        .domain(config.domain())
+        .path("/")
+        .max_age(Duration::days(config.session_expiration))
+        .secure(true)
+        .http_only(true)
+        .build();
+
+    headers.insert(
+        SET_COOKIE,
+        HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
+            .map_err(|e| AppError::custom_internal(&e.to_string()))?,
+    );
+    Ok(())
 }

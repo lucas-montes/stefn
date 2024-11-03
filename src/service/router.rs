@@ -3,17 +3,13 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Router,
 };
-use hyper::{
-    header::{AUTHORIZATION, CONTENT_TYPE, COOKIE},
-    Method,
-};
+use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE};
 use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
 use tower::ServiceBuilder;
 use tower_http::{
-    cors::{Any, CorsLayer},
     normalize_path::NormalizePathLayer,
     request_id::{MakeRequestId, RequestId},
     sensitive_headers::SetSensitiveRequestHeadersLayer,
@@ -25,8 +21,6 @@ use tower_http::{
     LatencyUnit, ServiceBuilderExt,
 };
 use tracing::Level;
-
-use crate::config::ServiceConfig;
 
 pub fn get_router<S>(state: S, routes: Router<S>) -> Router
 where

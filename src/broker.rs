@@ -154,7 +154,7 @@ where
         let created_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_secs() as i64;
+            .as_millis() as i64;
         Event {
             metadata: self.metadata.clone(),
             created_at,

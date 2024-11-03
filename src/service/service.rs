@@ -4,12 +4,16 @@ use futures::future::BoxFuture;
 use std::net::SocketAddr;
 use tokio::{net::TcpListener, signal};
 
-use crate::{config::ServiceConfig, state::SharedState, APIState, WebsiteState};
+use crate::{
+    config::{APIConfig, ServiceConfig, WebsiteConfig},
+    state::SharedState,
+    APIState, WebsiteState,
+};
 
 use super::get_router;
 
 pub struct WebsiteService {
-    config: ServiceConfig,
+    config: WebsiteConfig,
     router_factory: fn(WebsiteState) -> Router<WebsiteState>,
     router: Option<Router>,
 }
@@ -17,7 +21,7 @@ pub struct WebsiteService {
 impl WebsiteService {
     fn new(env_prefix: &str, router_factory: fn(WebsiteState) -> Router<WebsiteState>) -> Self {
         Self {
-            config: ServiceConfig::from_env_with_prefix(env_prefix),
+            config: WebsiteConfig::from_env_with_prefix(env_prefix),
             router_factory,
             router: None,
         }
@@ -27,7 +31,7 @@ impl WebsiteService {
 impl ServiceExt for WebsiteService {
     fn stub(self) -> Self {
         Self {
-            config: ServiceConfig::stub(),
+            config: WebsiteConfig::stub(),
             router_factory: self.router_factory,
             router: None,
         }
@@ -54,7 +58,7 @@ impl ServiceExt for WebsiteService {
 }
 
 pub struct APIService {
-    config: ServiceConfig,
+    config: APIConfig,
     router_factory: fn(APIState) -> Router<APIState>,
     router: Option<Router>,
 }
@@ -62,7 +66,7 @@ pub struct APIService {
 impl APIService {
     fn new(env_prefix: &str, router_factory: fn(APIState) -> Router<APIState>) -> Self {
         Self {
-            config: ServiceConfig::from_env_with_prefix(env_prefix),
+            config: APIConfig::from_env_with_prefix(env_prefix),
             router_factory,
             router: None,
         }
@@ -72,7 +76,7 @@ impl APIService {
 impl ServiceExt for APIService {
     fn stub(self) -> Self {
         Self {
-            config: ServiceConfig::stub(),
+            config: APIConfig::stub(),
             router_factory: self.router_factory,
             router: None,
         }
@@ -146,10 +150,7 @@ impl ServiceExt for Service {
     }
     async fn run(self) -> Result<(), std::io::Error> {
         match self {
-            Self::Background(s) => {
-                s.config.print();
-                s.run().await
-            }
+            Self::Background(s) => s.run().await,
             Self::API(s) => {
                 s.config.print();
                 s.run().await
@@ -163,14 +164,12 @@ impl ServiceExt for Service {
 }
 
 pub struct BackgroundService {
-    config: ServiceConfig,
     task: Box<dyn Fn() -> BoxFuture<'static, Result<(), std::io::Error>> + Send>,
 }
 
 impl BackgroundService {
     fn new(env_prefix: &str, task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
         Self {
-            config: ServiceConfig::from_env_with_prefix(env_prefix),
             task: Box::new(task),
         }
     }
@@ -178,10 +177,7 @@ impl BackgroundService {
 
 impl ServiceExt for BackgroundService {
     fn stub(self) -> Self {
-        Self {
-            config: ServiceConfig::stub(),
-            task: self.task,
-        }
+        Self { task: self.task }
     }
 
     async fn run(self) -> Result<(), std::io::Error> {

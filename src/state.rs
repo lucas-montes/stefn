@@ -1,13 +1,12 @@
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 
-use super::config::ServiceConfig;
-
 use crate::{
     auth::{create_validator, Keys},
     broker::Broker,
-    config::SharedConfig,
+    config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
+    sessions::Sessions,
 };
 
 #[derive(Clone)]
@@ -39,22 +38,24 @@ impl SharedState {
 
 #[derive(Clone, FromRef)]
 pub struct WebsiteState {
-    secrets: ServiceConfig,
+    secrets: WebsiteConfig,
     shared: SharedState,
-    keys: Keys,
+    sessions: Sessions,
 }
 
 impl WebsiteState {
-    pub fn new(secrets: ServiceConfig, shared: SharedState) -> Self {
+    pub fn new(secrets: WebsiteConfig, shared: SharedState) -> Self {
         Self {
-            keys: Keys::new(secrets.session_key.as_bytes()),
+            sessions: Sessions::new(&secrets.sessions_db),
             shared,
             secrets,
         }
     }
 
-    pub fn decoding(&self) -> &DecodingKey {
-        &self.keys.decoding
+    pub async fn find_session<T>(&self, session_id: &str) {}
+
+    pub fn get_session_cookie_name(&self) -> &str {
+        &self.secrets.session_cookie_name
     }
 }
 
@@ -68,22 +69,17 @@ impl FromRef<WebsiteState> for Broker {
         app_state.shared.events_broker.clone()
     }
 }
-impl FromRef<WebsiteState> for IpsDatabase {
-    fn from_ref(app_state: &WebsiteState) -> IpsDatabase {
-        app_state.shared.ips_database.clone()
-    }
-}
 
 #[derive(Clone, FromRef)]
 pub struct APIState {
-    secrets: ServiceConfig,
+    secrets: APIConfig,
     shared: SharedState,
     keys: Keys,
     jwt_validator: Validation,
 }
 
 impl APIState {
-    pub fn new(secrets: ServiceConfig, shared: SharedState) -> Self {
+    pub fn new(secrets: APIConfig, shared: SharedState) -> Self {
         Self {
             keys: Keys::new(secrets.session_key.as_bytes()),
             jwt_validator: create_validator(secrets.domain()),
@@ -117,10 +113,5 @@ impl FromRef<APIState> for Database {
 impl FromRef<APIState> for Broker {
     fn from_ref(app_state: &APIState) -> Broker {
         app_state.shared.events_broker.clone()
-    }
-}
-impl FromRef<APIState> for IpsDatabase {
-    fn from_ref(app_state: &APIState) -> IpsDatabase {
-        app_state.shared.ips_database.clone()
     }
 }

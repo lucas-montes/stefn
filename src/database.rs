@@ -1,6 +1,9 @@
-use std::{str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
+use maxminddb::geoip2;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, SqlitePool};
+
+use crate::AppError;
 
 #[derive(Clone)]
 pub struct Database {
@@ -47,5 +50,20 @@ impl IpsDatabase {
             )))
         };
         Self { storage }
+    }
+
+    pub fn get_country_code_from_ip(&self, addr: SocketAddr) -> Result<&str, AppError> {
+        if addr.ip().is_loopback() {
+            return Ok("ES");
+        }
+        self.storage
+            .as_ref()
+            .unwrap()
+            .lookup::<geoip2::City>(addr.ip())
+            .map_err(AppError::IpError)?
+            .country
+            .ok_or(AppError::IpDataNotFound)?
+            .iso_code
+            .ok_or(AppError::IpDataNotFound)
     }
 }

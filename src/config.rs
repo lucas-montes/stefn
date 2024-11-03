@@ -48,40 +48,101 @@ impl SharedConfig {
 }
 
 #[derive(Debug, Clone, FromEnv)]
-pub struct ServiceConfig {
+pub struct WebsiteConfig {
     ip: Ipv4Addr,
     port: u16,
     domain: String,
     allowed_origins: String,
     pub session_key: String,
+    pub sessions_db: String,
+    pub session_cookie_name: String,
+    pub session_expiration: i64,
 }
 
-impl ServiceConfig {
-    pub fn stub() -> Self {
+impl ServiceConfig for WebsiteConfig {
+    fn stub() -> Self {
         Self {
             ip: Ipv4Addr::new(0, 0, 0, 0),
             port: 8000,
             domain: "test.com".into(),
             allowed_origins: "*".into(),
             session_key: "session_key".to_owned(),
+            sessions_db: "./test-sessions.sqlite".to_owned(),
+            session_cookie_name: "session_id".to_owned(),
+            session_expiration: 30,
         }
     }
 
-    pub fn socket_addr(&self) -> (Ipv4Addr, u16) {
+    fn socket_addr(&self) -> (Ipv4Addr, u16) {
         (self.ip, self.port)
     }
 
-    pub fn allowed_origins(&self) -> AllowedOrigins {
+    fn allowed_origins(&self) -> AllowedOrigins {
         AllowedOrigins::from_string(&self.allowed_origins)
     }
 
-    pub fn domain(&self) -> &str {
+    fn domain(&self) -> &str {
         &self.domain
     }
 
-    pub fn print(&self) {
+    fn print(&self) {
         println!("http://{:?}:{:?}", &self.ip, &self.port)
     }
+}
+
+#[derive(Debug, Clone, FromEnv)]
+pub struct APIConfig {
+    ip: Ipv4Addr,
+    port: u16,
+    domain: String,
+    allowed_origins: String,
+    pub session_key: String,
+    pub sessions_db: String,
+    pub session_cookie_name: String,
+    pub session_expiration: i64,
+}
+
+impl ServiceConfig for APIConfig {
+    fn stub() -> Self {
+        Self {
+            ip: Ipv4Addr::new(0, 0, 0, 0),
+            port: 8000,
+            domain: "test.com".into(),
+            allowed_origins: "*".into(),
+            session_key: "session_key".to_owned(),
+            sessions_db: "./test-sessions.sqlite".to_owned(),
+            session_cookie_name: "session_id".to_owned(),
+            session_expiration: 30,
+        }
+    }
+
+    fn socket_addr(&self) -> (Ipv4Addr, u16) {
+        (self.ip, self.port)
+    }
+
+    fn allowed_origins(&self) -> AllowedOrigins {
+        AllowedOrigins::from_string(&self.allowed_origins)
+    }
+
+    fn domain(&self) -> &str {
+        &self.domain
+    }
+
+    fn print(&self) {
+        println!("http://{:?}:{:?}", &self.ip, &self.port)
+    }
+}
+
+pub trait ServiceConfig {
+    fn stub() -> Self;
+
+    fn socket_addr(&self) -> (Ipv4Addr, u16);
+
+    fn allowed_origins(&self) -> AllowedOrigins;
+
+    fn domain(&self) -> &str;
+
+    fn print(&self);
 }
 
 #[derive(Clone, Debug, Default)]

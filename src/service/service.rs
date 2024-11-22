@@ -118,11 +118,8 @@ impl Service {
     ) -> Self {
         Self::Website(WebsiteService::new(env_prefix, router_factory))
     }
-    pub fn background(
-        env_prefix: &str,
-        task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>,
-    ) -> Self {
-        Self::Background(BackgroundService::new(env_prefix, task))
+    pub fn background(task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
+        Self::Background(BackgroundService::new(task))
     }
     pub fn router(&self) -> Option<&Router> {
         match self {
@@ -168,7 +165,7 @@ pub struct BackgroundService {
 }
 
 impl BackgroundService {
-    fn new(env_prefix: &str, task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
+    fn new(task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
         Self {
             task: Box::new(task),
         }
@@ -187,7 +184,7 @@ impl ServiceExt for BackgroundService {
 
 pub trait ServiceExt {
     fn stub(self) -> Self;
-    fn set_up(&mut self, shared: SharedState) -> impl std::future::Future<Output = ()> {
+    fn set_up(&mut self, _shared: SharedState) -> impl std::future::Future<Output = ()> {
         async {}
     }
     fn run(self) -> impl std::future::Future<Output = Result<(), std::io::Error>>;

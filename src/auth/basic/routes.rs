@@ -1,17 +1,13 @@
 use axum::{
-    extract::{ConnectInfo, Query, State},
+    extract::{Query, State},
     response::{IntoResponse, Redirect, Response},
     Extension, Form,
 };
 use serde::Deserialize;
-use std::net::SocketAddr;
 
 use crate::{sessions::Session, AppError, WebsiteState};
 
-use super::{
-    infrastructures::find_user_by_email,
-    services::{set_session_cookies, verify_password},
-};
+use super::{infrastructures::find_user_by_email, services::verify_password};
 
 #[derive(Deserialize)]
 pub struct LoginForm {

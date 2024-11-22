@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use menva::read_default_file;
 use tokio::task::JoinSet;
 
@@ -79,7 +77,7 @@ impl ServicesOrquestrator {
         for mut service in self.services {
             service.set_up(state.clone()).await;
 
-            set.spawn(async move { service.run().await });
+            set.spawn(service.run());
         }
 
         set.join_all().await

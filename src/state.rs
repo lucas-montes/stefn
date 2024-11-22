@@ -102,6 +102,10 @@ impl APIState {
         }
     }
 
+    pub fn domain(&self) -> &str {
+        self.secrets.domain()
+    }
+
     pub fn events_broker(&self) -> &Broker {
         &self.shared.events_broker
     }

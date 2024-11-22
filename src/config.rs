@@ -24,8 +24,8 @@ impl FromStr for Env {
 
 #[derive(Debug, Clone, FromEnv)]
 pub struct SharedConfig {
-    env: Env,
-    max_upload_size: u64,
+    pub env: Env,
+    pub max_upload_size: u64,
     pub ips_database_url: String,
     pub database_url: String,
     pub broker_url: String,

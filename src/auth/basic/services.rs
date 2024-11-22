@@ -8,8 +8,8 @@ use hyper::HeaderMap;
 
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
-    sessions::{Session, Sessions},
-    AppError, WebsiteState,
+    sessions::Session,
+    AppError,
 };
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {

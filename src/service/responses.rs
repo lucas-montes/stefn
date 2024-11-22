@@ -20,20 +20,20 @@ pub struct PaginatedQuery<T> {
     per_page: Option<i64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PaginatedResponse<T> {
-    data: Vec<T>,
-    total_pages: i64,
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// pub struct PaginatedResponse<T> {
+//     data: Vec<T>,
+//     total_pages: i64,
+// }
 
-impl<T> PaginatedResponse<T> {
-    pub fn new(data: Vec<T>, total_pages: i64) -> Self {
-        Self { data, total_pages }
-    }
-    pub fn response(data: Vec<T>, total_pages: i64) -> AppResult<Self> {
-        Ok(Json(Self::new(data, total_pages)))
-    }
-}
+// impl<T> PaginatedResponse<T> {
+//     pub fn new(data: Vec<T>, total_pages: i64) -> Self {
+//         Self { data, total_pages }
+//     }
+//     pub fn response(data: Vec<T>, total_pages: i64) -> AppResult<Self> {
+//         Ok(Json(Self::new(data, total_pages)))
+//     }
+// }
 
 #[derive(FromRequest)]
 #[from_request(via(axum::Json), rejection(AppError))]

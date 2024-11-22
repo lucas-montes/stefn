@@ -7,9 +7,6 @@ repository = "https://github.com/lucas-montes/stefn"
 authors = ["Lucas Montes <lluc23@hotmail.com>"]
 description = "An opinionated and blazingly fast meta framework"
 
-[workspace]
-members = ["stefn-macros"]
-
 [dependencies]
 tokio = { version = "1.38.0", features = ["full"] }
 

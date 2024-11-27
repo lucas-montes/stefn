@@ -8,6 +8,8 @@ authors = ["Lucas Montes <lluc23@hotmail.com>"]
 description = "An opinionated and blazingly fast meta framework"
 
 [dependencies]
+stefn-macros = { path = "./stefn-macros", version = "0.1.0" }
+
 tokio = { version = "1.38.0", features = ["full"] }
 
 axum = { version = "0.7.5", features = ["multipart", "json", "query", "http2", "macros", "tracing", "ws"] }
@@ -17,6 +19,9 @@ tower-http = { version = "0.6.1", features = ["full"] }
 hyper = { version = "1.3.1", features = ["full"] }
 
 utoipa = { version = "=5.0.0", features = ["axum_extras", "chrono", "decimal"] }
+
+askama = { version = "0.12.1", features = ["with-axum"] }
+askama_axum = "0.4.0"
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <script src="https://unpkg.com/htmx.org@2.0.3"
+    integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
+    crossorigin="anonymous"></script>
+
+  {% block meta %}{% include "base/meta.html" %}{% endblock meta %}
+  {% block css %}
+  <!-- [Tabler Icons] https://tablericons.com -->
+  <link rel="stylesheet" href="/dist/assets/fonts/tabler-icons.min.css">
+  <!-- [Feather Icons] https://feathericons.com -->
+  <link rel="stylesheet" href="/dist/assets/fonts/feather.css">
+  <!-- [Font Awesome Icons] https://fontawesome.com/icons -->
+  <link rel="stylesheet" href="/dist/assets/fonts/fontawesome.css">
+  <!-- [Material Icons] https://fonts.google.com/icons -->
+  <link rel="stylesheet" href="/dist/assets/fonts/material.css">
+  <!-- [Template CSS Files] -->
+  <link rel="stylesheet" href="/dist/assets/css/style.css" id="main-style-link">
+  <link rel="stylesheet" href="/dist/assets/css/style-preset.css">
+  {% endblock css %}
+  {% block extra_head %}{% endblock extra_head %}
+</head>
+
+<body>
+  <div class="loader-bg">
+    <div class="loader-track">
+      <div class="loader-fill"></div>
+    </div>
+  </div>
+  {% block master_body %}{% endblock master_body %}
+  {% block scripts %}{% include "base/scripts.html" %}{% endblock scripts %}
+</body>
+
+</html>

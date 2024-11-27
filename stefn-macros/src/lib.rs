@@ -65,7 +65,6 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, Meta};
 #[proc_macro_derive(ToForm, attributes(form_field))]
 pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let named_fields = get_named_fields(&input);
     let struct_name = &input.ident;
 
     // let fields = if let Data::Struct(data) = &input.data {

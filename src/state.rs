@@ -13,14 +13,19 @@ use crate::{
 pub struct SharedState {
     database: Database,
     events_broker: Broker,
-    ips_database: IpsDatabase,
+    ips_database: Option<IpsDatabase>,
 }
 
 impl SharedState {
     pub fn new(config: &SharedConfig) -> Self {
+        let ips_database = if config.ips_database_url.is_empty() {
+            None
+        } else {
+            Some(IpsDatabase::new(&config.ips_database_url))
+        };
         Self {
             database: Database::new(&config.database_url),
-            ips_database: IpsDatabase::new(&config.ips_database_url),
+            ips_database,
             events_broker: Broker::new(&config.broker_url),
         }
     }
@@ -31,9 +36,6 @@ impl SharedState {
 
     pub fn events_broker(&self) -> &Broker {
         &self.events_broker
-    }
-    pub fn ips_database(&self) -> &IpsDatabase {
-        &self.ips_database
     }
 }
 
@@ -57,7 +59,7 @@ impl WebsiteState {
         &self.shared.events_broker
     }
     pub fn ips_database(&self) -> &IpsDatabase {
-        &self.shared.ips_database
+        &self.shared.ips_database.as_ref().unwrap()
     }
 
     pub fn config(&self) -> &WebsiteConfig {
@@ -110,7 +112,7 @@ impl APIState {
         &self.shared.events_broker
     }
     pub fn ips_database(&self) -> &IpsDatabase {
-        &self.shared.ips_database
+        &self.shared.ips_database.as_ref().unwrap()
     }
 
     pub fn database(&self) -> &Database {

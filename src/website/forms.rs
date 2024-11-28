@@ -1,20 +1,19 @@
 use std::{borrow::Cow, fmt};
 
 pub struct InputTag<'a> {
-    attributes: BasicAttributes<'a>,
-    name: Cow<'a, str>,
-    type_: InputType,
-    value: Option<String>,
-    placeholder: Option<Cow<'a, str>>,
-    error: Option<Cow<'a, str>>,
-    required: bool,
+    pub attributes: BasicAttributes<'a>,
+    pub name: Cow<'a, str>,
+    pub type_: InputType,
+    pub value: Option<String>,
+    pub placeholder: Cow<'a, str>,
+    pub error: Option<Cow<'a, str>>,
+    pub required: bool,
 }
 
 impl<'a> InputTag<'a> {
-    pub fn new(name: Cow<'a, str>, type_: InputType, placeholder: Option<Cow<'a, str>>) -> Self {
+    pub fn new(name: Cow<'a, str>, type_: InputType) -> Self {
         let mut tag = Self::default();
         tag.name = name;
-        tag.placeholder = placeholder;
         tag.type_ = type_;
         tag
     }
@@ -24,7 +23,7 @@ impl<'a> InputTag<'a> {
             name: Cow::default(),
             type_: InputType::default(),
             value: None,
-            placeholder: None,
+            placeholder: Cow::default(),
             error: None,
             required: false,
         }
@@ -40,7 +39,7 @@ impl<'a> fmt::Display for InputTag<'a> {
             self.name,
             self.type_,
             self.value.as_ref().map_or("", |f| f),
-            self.placeholder.as_ref().map_or("", |f| f),
+            self.placeholder,
         )
     }
 }

@@ -76,7 +76,7 @@ where
 
     async fn list<'a>() -> IndexTemplate<'a> {
         let meta = Meta::new(
-            "dashboard title".into(),
+            "list all objects".into(),
             "elerem mola".into(),
             "recsys,mola".into(),
             "lucas montes".into(),
@@ -96,7 +96,7 @@ where
 
     async fn get_create_form<'a>() -> AdminFormTemplate<'a> {
         let meta = Meta::new(
-            "dashboard title".into(),
+            "create new object".into(),
             "elerem mola".into(),
             "recsys,mola".into(),
             "lucas montes".into(),
@@ -112,7 +112,7 @@ where
         Path(model_pk): Path<i64>,
     ) -> Result<AdminFormTemplate<'a>, AppError> {
         let meta = Meta::new(
-            "dashboard title".into(),
+            "update a object".into(),
             "elerem mola".into(),
             "recsys,mola".into(),
             "lucas montes".into(),

@@ -1,115 +1,36 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, FieldsNamed, Meta};
+use syn::{parse_macro_input, Data, DeriveInput, LitStr};
 
-// fn create_inputs_from_attributes(named_fields: &FieldsNamed) -> proc_macro2::TokenStream {
-//     let fields = named_fields
-//         .named
-//         .iter()
-//         .map(|field| {
-//             let field_name = field.ident.as_ref().unwrap();
-//             let field_name_str = field_name.to_string().to_uppercase();
-
-//             let env_var_name = get_env_var_name(field, field_name_str);
-
-//             quote! {
-//                 InputTag {
-//                     attributes: BasicAttributes {
-//                         id: Cow::Borrowed(""),
-//                         class: Cow::Borrowed("form-control"),
-//                         style: Cow::Borrowed(""),
-//                     },
-//                     name: Cow::Borrowed(#field_name),
-//                     type_: match #field_type.as_str() {
-//                         "text" => InputType::Text,
-//                         "email" => InputType::Email,
-//                         "number" => InputType::Number,
-//                         "password" => InputType::Password,
-//                         "select" => InputType::Select,
-//                         _ => InputType::Text,
-//                     },
-//                     value: None,
-//                     placeholder: #placeholder.map(Cow::Borrowed),
-//                     error: None,
-//                     required: #required,
-//                 }
-//             }
-//         })
-//         .collect::<Vec<_>>();
-
-//     quote! {
-//         pub fn from_env() -> Self {
-//             Self {
-//                 #(#fields),*
-//             }
-//         }
-//     }
-// }
-
-// fn get_env_var_name(field: &syn::Field, field_name_str: String) -> String {
-//     field
-//         .attrs
-//         .iter()
-//         .find(|attr| attr.path().is_ident("form_field"))
-//         .map(|attr| {
-//             let mut prefix = attr
-//                 .parse_args::<LitStr>()
-//                 .expect(&format!("Prefix for `{}` has a problem", field_name_str))
-//                 .value();
-//             prefix.push_str(&field_name_str);
-//             prefix
-//         })
-//         .unwrap_or(field_name_str)
-// }
-
-#[proc_macro_derive(ToForm, attributes(form_field))]
+#[proc_macro_derive(ToForm, attributes(html))]
 pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let struct_name = &input.ident;
 
-    // let fields = if let Data::Struct(data) = &input.data {
-    //     data.fields.iter().map(|field| {
-    //         let field_name = field.ident.as_ref().unwrap().to_string();
-    //         let mut field_type = "text".to_string();
-    //         let mut placeholder = None;
-    //         let mut required = false;
+    let struct_name = input.ident;
+    let fields = match input.data {
+        Data::Struct(data) => data.fields,
+        _ => panic!("#[derive(ToForm)] can only be used on structs"),
+    };
 
-    //         quote! {
-    //             InputTag {
-    //                 attributes: BasicAttributes {
-    //                     id: Cow::Borrowed(""),
-    //                     class: Cow::Borrowed("form-control"),
-    //                     style: Cow::Borrowed(""),
-    //                 },
-    //                 name: Cow::Borrowed(#field_name),
-    //                 type_: match #field_type.as_str() {
-    //                     "text" => InputType::Text,
-    //                     "email" => InputType::Email,
-    //                     "number" => InputType::Number,
-    //                     "password" => InputType::Password,
-    //                     "select" => InputType::Select,
-    //                     _ => InputType::Text,
-    //                 },
-    //                 value: None,
-    //                 placeholder: #placeholder.map(Cow::Borrowed),
-    //                 error: None,
-    //                 required: #required,
-    //             }
-    //         }
-    //     })
-    // } else {
-    //     panic!("ToHtmlForm can only be derived for structs");
-    // };
+    let full_fields: Vec<_> = fields
+        .iter()
+        .map(|field| process_field(&field, true))
+        .collect();
 
+    let empty_fields: Vec<_> = fields
+        .iter()
+        .map(|field| process_field(&field, false))
+        .collect();
+
+    // Generate the implementation
     let expanded = quote! {
         impl stefn::ToForm for #struct_name {
             fn to_form<'a>(&self) -> stefn::HtmlTag<'a> {
-                stefn::HtmlTag::Form(stefn::FormTag::new(vec![]))
+                stefn::HtmlTag::Form(stefn::FormTag::new(vec![#(#full_fields),*]))
             }
 
-            fn to_empty_form<'a>() -> stefn::HtmlTag<'a>
-            {
-                stefn::HtmlTag::Form(stefn::FormTag::new(vec![]))
+            fn to_empty_form<'a>() -> stefn::HtmlTag<'a> {
+                stefn::HtmlTag::Form(stefn::FormTag::new(vec![#(#empty_fields),*]))
             }
         }
     };
@@ -117,14 +38,111 @@ pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn get_named_fields(input: &DeriveInput) -> &FieldsNamed {
-    if let Data::Struct(data) = &input.data {
-        if let Fields::Named(named_fields) = &data.fields {
-            named_fields
+fn process_field(field: &syn::Field, include_value: bool) -> proc_macro2::TokenStream {
+    let field_name = field.ident.as_ref().unwrap();
+
+    field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("html"))
+        .and_then(|attr| Some(FormFieldAttributes::new(attr)))
+        .unwrap_or_default()
+        .to_input_tag(&field_name, include_value)
+}
+
+fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStream {
+    tag_attribute.as_ref().map_or(
+        quote! { std::borrow::Cow::default() },
+        |c| quote! { #c.into() },
+    )
+}
+
+#[derive(Default)]
+struct FormFieldAttributes {
+    id: Option<syn::LitStr>,
+    style: Option<syn::LitStr>,
+    class: Option<syn::LitStr>,
+    type_: Option<syn::LitStr>,
+    name: Option<syn::LitStr>,
+    placeholder: Option<syn::LitStr>,
+}
+
+impl FormFieldAttributes {
+    fn new(attr: &syn::Attribute) -> Self {
+        let mut attrs = FormFieldAttributes::default();
+
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("id") {
+                attrs.id = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("style") {
+                attrs.style = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("class") {
+                attrs.class = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("type") {
+                attrs.type_ = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("name") {
+                attrs.name = Some(meta.value()?.parse()?);
+            } else if meta.path.is_ident("placeholder") {
+                attrs.placeholder = Some(meta.value()?.parse()?);
+            }
+            Ok(())
+        })
+        .unwrap();
+
+        attrs
+    }
+    fn resolve_type(&self) -> proc_macro2::TokenStream {
+        self.type_.as_ref().map_or_else(
+            || quote! { stefn::InputType::Text },
+            |t| {
+                let type_str = t.value();
+                quote! { stefn::InputType::from(#type_str) }
+            },
+        )
+    }
+
+    fn resolve_name(&self, field_name: &syn::Ident) -> proc_macro2::TokenStream {
+        self.name.as_ref().map_or_else(
+            || quote! { stringify!(#field_name).into() },
+            |n| quote! { #n.into() },
+        )
+    }
+
+    fn resolve_value(
+        &self,
+        field_name: &syn::Ident,
+        include_value: bool,
+    ) -> proc_macro2::TokenStream {
+        if include_value {
+            quote! { Some(self.#field_name.to_string()) }
         } else {
-            panic!("FromEnvWithPrefix can only be derived for structs with named fields");
+            quote! { None }
         }
-    } else {
-        panic!("FromEnvWithPrefix can only be derived for structs");
+    }
+
+    fn to_input_tag(
+        &self,
+        field_name: &syn::Ident,
+        include_value: bool,
+    ) -> proc_macro2::TokenStream {
+        let id = get_default_stream(&self.id);
+        let style = get_default_stream(&self.style);
+        let type_ = self.resolve_type();
+        let name = self.resolve_name(field_name);
+        let placeholder = get_default_stream(&self.placeholder);
+        let value = self.resolve_value(field_name, include_value);
+        let class = get_default_stream(&self.class);
+
+        quote! {
+            stefn::HtmlTag::Input(stefn::InputTag {
+                attributes: stefn::BasicAttributes::new(#id, #class, #style),
+                name: #name,
+                type_: #type_,
+                value: #value,
+                placeholder: #placeholder,
+                error: None,
+                required: false,
+            })
+        }
     }
 }

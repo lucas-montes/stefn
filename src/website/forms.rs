@@ -1,4 +1,4 @@
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, fmt, str::FromStr};
 
 #[derive(Default)]
 pub struct InputTag<'a> {
@@ -7,7 +7,7 @@ pub struct InputTag<'a> {
     type_: InputType,
     value: Option<String>,
     placeholder: Cow<'a, str>,
-    error: Option<Cow<'a, str>>,
+    error: Option<Cow<'a, str>>,//TODO: handle errors and display them
     required: bool,
 }
 
@@ -27,12 +27,13 @@ impl<'a> fmt::Display for InputTag<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "<input {} name=\"{}\" type_=\"{}\" value=\"{}\" placeholder=\"{}\"/>",
+            "<input {} name=\"{}\" type_=\"{}\" value=\"{}\" placeholder=\"{}\" {}/>",
             self.attributes,
             self.name,
             self.type_,
             self.value.as_ref().map_or("", |f| f),
             self.placeholder,
+            self.required.then(|| "required").unwrap_or_default()
         )
     }
 }
@@ -45,6 +46,21 @@ pub enum InputType {
     Email,
     Select,
     Password,
+}
+
+impl FromStr for InputType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "text" => Ok(Self::Text),
+            "number" => Ok(Self::Number),
+            "email" => Ok(Self::Email),
+            "select" => Ok(Self::Select),
+            "password" => Ok(Self::Password),
+            _ => Err(format!("Invalid value for enum Env: {}", s)),
+        }
+    }
 }
 
 impl fmt::Display for InputType {

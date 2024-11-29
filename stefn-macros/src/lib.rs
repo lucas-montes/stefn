@@ -2,8 +2,17 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, LitStr};
 
+#[proc_macro_derive(ToBootstrapForm, attributes(html))]
+pub fn to_bootstrap_form(input: TokenStream) -> TokenStream {
+    to_html_form_derive::<BootstrapStyle>(input)
+}
+
 #[proc_macro_derive(ToForm, attributes(html))]
-pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
+pub fn to_regular_form(input: TokenStream) -> TokenStream {
+    to_html_form_derive::<RegularStyle>(input)
+}
+
+fn to_html_form_derive<S: FormStyle>(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let struct_name = input.ident;
@@ -14,15 +23,14 @@ pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
 
     let full_fields: Vec<_> = fields
         .iter()
-        .map(|field| process_field(&field, true))
+        .map(|field| process_field::<S>(&field, true))
         .collect();
 
     let empty_fields: Vec<_> = fields
         .iter()
-        .map(|field| process_field(&field, false))
+        .map(|field| process_field::<S>(&field, false))
         .collect();
 
-    // Generate the implementation
     let expanded = quote! {
         impl stefn::forms::ToForm for #struct_name {
             fn to_form<'a>(&self) -> stefn::forms::HtmlTag<'a> {
@@ -38,7 +46,10 @@ pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn process_field(field: &syn::Field, include_value: bool) -> proc_macro2::TokenStream {
+fn process_field<S: FormStyle>(
+    field: &syn::Field,
+    include_value: bool,
+) -> proc_macro2::TokenStream {
     let field_name = field.ident.as_ref().unwrap();
 
     field
@@ -47,7 +58,7 @@ fn process_field(field: &syn::Field, include_value: bool) -> proc_macro2::TokenS
         .find(|attr| attr.path().is_ident("html"))
         .and_then(|attr| Some(FormFieldAttributes::new(attr)))
         .unwrap_or_default()
-        .to_input_tag(&field_name, include_value)
+        .to_form_input::<S>(&field_name, include_value)
 }
 
 fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStream {
@@ -55,6 +66,44 @@ fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStrea
         quote! { std::borrow::Cow::default() },
         |c| quote! { #c.into() },
     )
+}
+
+trait FormStyle {
+    fn div_class() -> &'static str;
+    fn input_class() -> &'static str;
+    fn label_class() -> &'static str;
+}
+
+struct BootstrapStyle;
+
+impl FormStyle for BootstrapStyle {
+    fn div_class() -> &'static str {
+        "mb-3"
+    }
+
+    fn input_class() -> &'static str {
+        "form-control"
+    }
+
+    fn label_class() -> &'static str {
+        "form-label"
+    }
+}
+
+struct RegularStyle;
+
+impl FormStyle for RegularStyle {
+    fn div_class() -> &'static str {
+        "default-div"
+    }
+
+    fn input_class() -> &'static str {
+        "default-input"
+    }
+
+    fn label_class() -> &'static str {
+        "default-label"
+    }
 }
 
 #[derive(Default)]
@@ -84,7 +133,7 @@ impl FormFieldAttributes {
                 Some("div_class") => attrs.div_class = Some(value),
                 Some("input_class") => attrs.input_class = Some(value),
                 Some("label_class") => attrs.label_class = Some(value),
-                Some("type") => attrs.type_ = Some(value),
+                Some("type_") => attrs.type_ = Some(value),
                 Some("name") => attrs.name = Some(value),
                 Some("placeholder") => attrs.placeholder = Some(value),
                 Some("label") => attrs.label = Some(value),
@@ -102,12 +151,13 @@ impl FormFieldAttributes {
 
         attrs
     }
+
     fn resolve_type(&self) -> proc_macro2::TokenStream {
         self.type_.as_ref().map_or_else(
             || quote! { stefn::forms::InputType::Text },
             |t| {
                 let type_str = t.value();
-                quote! { stefn::forms::InputType::from(#type_str) }
+                quote! { std::str::FromStr::from_str(#type_str).unwrap() }
             },
         )
     }
@@ -141,7 +191,31 @@ impl FormFieldAttributes {
         quote! { #unique_id.into() }
     }
 
-    fn to_input_tag(
+    fn resolve_div_class<S: FormStyle>(&self) -> proc_macro2::TokenStream {
+        let default_value = S::div_class();
+        self.div_class.as_ref().map_or_else(
+            || quote! { #default_value.into() },
+            |class| quote! { #class.into() },
+        )
+    }
+
+    fn resolve_input_class<S: FormStyle>(&self) -> proc_macro2::TokenStream {
+        let default_value = S::input_class();
+        self.input_class.as_ref().map_or_else(
+            || quote! { #default_value.into() },
+            |class| quote! { #class.into() },
+        )
+    }
+
+    fn resolve_label_class<S: FormStyle>(&self) -> proc_macro2::TokenStream {
+        let default_value = S::label_class();
+        self.label_class.as_ref().map_or_else(
+            || quote! { #default_value.into() },
+            |class| quote! { #class.into() },
+        )
+    }
+
+    fn to_form_input<S: FormStyle>(
         &self,
         field_name: &syn::Ident,
         include_value: bool,
@@ -156,9 +230,9 @@ impl FormFieldAttributes {
         let placeholder = get_default_stream(&self.placeholder);
         let value = self.resolve_value(field_name, include_value);
 
-        let div_class = get_default_stream(&self.div_class);
-        let input_class = get_default_stream(&self.input_class);
-        let label_class = get_default_stream(&self.label_class);
+        let div_class = self.resolve_div_class::<S>();
+        let input_class = self.resolve_input_class::<S>();
+        let label_class = self.resolve_label_class::<S>();
 
         quote! {
             stefn::forms::HtmlTag::ParentTag(stefn::forms::GeneralParentTag::new(

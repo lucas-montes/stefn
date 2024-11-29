@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, LitStr};
+use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, LitStr};
 
 #[proc_macro_derive(ToForm, attributes(html))]
 pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
@@ -74,25 +74,31 @@ impl FormFieldAttributes {
     fn new(attr: &syn::Attribute) -> Self {
         let mut attrs = FormFieldAttributes::default();
 
-        //TODO: if id empty use the field_name
-
         attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("id") {
-                attrs.id = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("style") {
-                attrs.style = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("class") {
-                attrs.class = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("type") {
-                attrs.type_ = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("name") {
-                attrs.name = Some(meta.value()?.parse()?);
-            } else if meta.path.is_ident("placeholder") {
-                attrs.placeholder = Some(meta.value()?.parse()?);
+            let key = meta.path.get_ident().map(|id| id.to_string());
+            let value: LitStr = meta.value()?.parse()?;
+
+            match key.as_deref() {
+                Some("id") => attrs.id = Some(value),
+                Some("style") => attrs.style = Some(value),
+                Some("div_class") => attrs.div_class = Some(value),
+                Some("input_class") => attrs.input_class = Some(value),
+                Some("label_class") => attrs.label_class = Some(value),
+                Some("type") => attrs.type_ = Some(value),
+                Some("name") => attrs.name = Some(value),
+                Some("placeholder") => attrs.placeholder = Some(value),
+                Some("label") => attrs.label = Some(value),
+                Some(v) => {
+                    return Err(syn::Error::new(
+                        meta.path.span(),
+                        format!("Unknown attribute {}", v),
+                    ))
+                }
+                None => {}
             }
             Ok(())
         })
-        .unwrap();
+        .unwrap_or_else(|err| panic!("Error parsing attributes : {}", err));
 
         attrs
     }

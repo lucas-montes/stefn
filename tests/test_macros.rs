@@ -5,7 +5,7 @@ use stefn::ToForm;
 fn test_macro() {
     #[derive(ToForm)]
     struct UserCreate {
-        #[html(id = "EarlGrey", class = "primary")]
+        #[html(id = "EarlGrey", div_class = "primary")]
         username: String,
     }
 
@@ -15,12 +15,12 @@ fn test_macro() {
 
     assert_eq!(
         &user.to_form().to_string(),
-        "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><div id=\"EarlGrey\" class=\"primary\" style=\"\"><label id=\"EarlGrey\" class=\"primary\" style=\"\">username</label><input id=\"EarlGrey\" class=\"primary\" style=\"\" name=\"username\" type_=\"text\" value=\"hey\" placeholder=\"\"/></div></form>"
+        "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><div id=\"EarlGrey-div\" class=\"primary\" style=\"\"><label id=\"EarlGrey-label\" class=\"\" style=\"\">username</label><input id=\"EarlGrey-input\" class=\"\" style=\"\" name=\"username\" type_=\"text\" value=\"hey\" placeholder=\"\"/></div></form>"
     );
 
     assert_eq!(
         &UserCreate::to_empty_form().to_string(),
-        "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><div id=\"EarlGrey\" class=\"primary\" style=\"\"><label id=\"EarlGrey\" class=\"primary\" style=\"\">username</label><input id=\"EarlGrey\" class=\"primary\" style=\"\" name=\"username\" type_=\"text\" value=\"\" placeholder=\"\"/></div></form>"
+        "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><div id=\"EarlGrey-div\" class=\"primary\" style=\"\"><label id=\"EarlGrey-label\" class=\"\" style=\"\">username</label><input id=\"EarlGrey-input\" class=\"\" style=\"\" name=\"username\" type_=\"text\" value=\"\" placeholder=\"\"/></div></form>"
     );
 }
 
@@ -28,7 +28,7 @@ fn test_macro() {
 fn test_macro_full() {
     #[derive(ToForm)]
     struct UserCreate {
-        #[html(id = "EarlGrey", class = "primary")]
+        #[html(id = "EarlGrey", div_class = "primary")]
         username: String,
         age: f64,
     }

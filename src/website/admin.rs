@@ -16,7 +16,10 @@ use crate::{
     AppError, Database, WebsiteState,
 };
 
-use super::{seo::Meta, HtmlTag, ToForm};
+use super::{
+    forms::{HtmlTag, ToForm},
+    seo::Meta,
+};
 
 #[derive(Template)]
 #[template(path = "index.html")]

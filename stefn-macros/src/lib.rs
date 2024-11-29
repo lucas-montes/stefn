@@ -24,13 +24,13 @@ pub fn to_html_form_derive(input: TokenStream) -> TokenStream {
 
     // Generate the implementation
     let expanded = quote! {
-        impl stefn::ToForm for #struct_name {
-            fn to_form<'a>(&self) -> stefn::HtmlTag<'a> {
-                stefn::HtmlTag::Form(stefn::FormTag::new(vec![#(#full_fields),*]))
+        impl stefn::forms::ToForm for #struct_name {
+            fn to_form<'a>(&self) -> stefn::forms::HtmlTag<'a> {
+                stefn::forms::HtmlTag::Form(stefn::forms::FormTag::new(vec![#(#full_fields),*]))
             }
 
-            fn to_empty_form<'a>() -> stefn::HtmlTag<'a> {
-                stefn::HtmlTag::Form(stefn::FormTag::new(vec![#(#empty_fields),*]))
+            fn to_empty_form<'a>() -> stefn::forms::HtmlTag<'a> {
+                stefn::forms::HtmlTag::Form(stefn::forms::FormTag::new(vec![#(#empty_fields),*]))
             }
         }
     };
@@ -59,17 +59,22 @@ fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStrea
 
 #[derive(Default)]
 struct FormFieldAttributes {
-    id: Option<syn::LitStr>,
-    style: Option<syn::LitStr>,
-    class: Option<syn::LitStr>,
-    type_: Option<syn::LitStr>,
-    name: Option<syn::LitStr>,
-    placeholder: Option<syn::LitStr>,
+    id: Option<LitStr>,
+    style: Option<LitStr>,
+    div_class: Option<LitStr>,
+    input_class: Option<LitStr>,
+    label_class: Option<LitStr>,
+    type_: Option<LitStr>,
+    name: Option<LitStr>,
+    label: Option<LitStr>,
+    placeholder: Option<LitStr>,
 }
 
 impl FormFieldAttributes {
     fn new(attr: &syn::Attribute) -> Self {
         let mut attrs = FormFieldAttributes::default();
+
+        //TODO: if id empty use the field_name
 
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("id") {
@@ -93,10 +98,10 @@ impl FormFieldAttributes {
     }
     fn resolve_type(&self) -> proc_macro2::TokenStream {
         self.type_.as_ref().map_or_else(
-            || quote! { stefn::InputType::Text },
+            || quote! { stefn::forms::InputType::Text },
             |t| {
                 let type_str = t.value();
-                quote! { stefn::InputType::from(#type_str) }
+                quote! { stefn::forms::InputType::from(#type_str) }
             },
         )
     }
@@ -120,29 +125,57 @@ impl FormFieldAttributes {
         }
     }
 
+    fn generate_id(&self, field_name: &syn::Ident, tag: &str) -> proc_macro2::TokenStream {
+        let mut unique_id = self
+            .id
+            .as_ref()
+            .map_or(field_name.to_string(), |i| i.value());
+        unique_id.push_str("-");
+        unique_id.push_str(tag);
+        quote! { #unique_id.into() }
+    }
+
     fn to_input_tag(
         &self,
         field_name: &syn::Ident,
         include_value: bool,
     ) -> proc_macro2::TokenStream {
-        let id = get_default_stream(&self.id);
+        let div_id = self.generate_id(&field_name, "div");
+        let input_id = self.generate_id(&field_name, "input");
+        let label_id = self.generate_id(&field_name, "label");
+
         let style = get_default_stream(&self.style);
         let type_ = self.resolve_type();
         let name = self.resolve_name(field_name);
         let placeholder = get_default_stream(&self.placeholder);
         let value = self.resolve_value(field_name, include_value);
-        let class = get_default_stream(&self.class);
+
+        let div_class = get_default_stream(&self.div_class);
+        let input_class = get_default_stream(&self.input_class);
+        let label_class = get_default_stream(&self.label_class);
 
         quote! {
-            stefn::HtmlTag::Input(stefn::InputTag {
-                attributes: stefn::BasicAttributes::new(#id, #class, #style),
-                name: #name,
-                type_: #type_,
-                value: #value,
-                placeholder: #placeholder,
-                error: None,
-                required: false,
-            })
+            stefn::forms::HtmlTag::ParentTag(stefn::forms::GeneralParentTag::new(
+                stefn::forms::ParentTag::Div,
+                stefn::forms::BasicAttributes::new(#div_id, #div_class, #style),
+                vec![
+                    stefn::forms::HtmlTag::ChildTag(stefn::forms::GeneralChildTag::new(
+                        stefn::forms::ChildTag::Label,
+                        stefn::forms::BasicAttributes::new(#label_id, #label_class, #style),
+                        #name,
+                    )),
+                    stefn::forms::HtmlTag::Input(stefn::forms::InputTag::new(
+                        stefn::forms::BasicAttributes::new(#input_id, #input_class, #style),
+                        #name,
+                        #type_,
+                        #value,
+                        #placeholder,
+                        None,
+                        false,
+                    ))
+                ],
+            ))
+
         }
     }
 }

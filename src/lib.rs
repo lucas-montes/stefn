@@ -22,4 +22,4 @@ pub use state::{APIState, WebsiteState};
 pub use orquestrator::ServicesOrquestrator;
 
 pub use stefn_macros::ToForm;
-pub use website::{Admin, BasicAttributes, FormTag, HtmlTag, InputTag, InputType, Meta, ToForm};
+pub use website::{forms, Admin, Meta};

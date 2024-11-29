@@ -30,17 +30,19 @@ pub trait Manager {
             .begin()
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+
+        let mut query_builder = QueryBuilder::new("SELECT * FROM ");
+        query_builder.push(Self::TABLE);
         if let Where::Pk(pk) = clause {
-            sqlx::query_as("SELECT * FROM $1 WHERE pk = $2;")
-                .bind(Self::TABLE)
+            query_builder.push(" WHERE pk = $1;");
+            query_builder
+                .build_query_as()
                 .bind(pk)
                 .fetch_optional(&mut *tx)
                 .await
                 .map_err(|e| AppError::custom_internal(&e.to_string()))
         } else {
-            let mut query_builder = QueryBuilder::new("SELECT * from $1 WHERE");
-            //TODO: add the custom where clause
-            query_builder.push_bind(Self::TABLE);
+            query_builder.push(" WHERE pk = $1;");
             query_builder
                 .build_query_as()
                 .fetch_optional(&mut *tx)

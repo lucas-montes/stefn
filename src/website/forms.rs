@@ -1,32 +1,25 @@
 use std::{borrow::Cow, fmt};
 
+#[derive(Default)]
 pub struct InputTag<'a> {
-    pub attributes: BasicAttributes<'a>,
-    pub name: Cow<'a, str>,
-    pub type_: InputType,
-    pub value: Option<String>,
-    pub placeholder: Cow<'a, str>,
-    pub error: Option<Cow<'a, str>>,
-    pub required: bool,
+    attributes: BasicAttributes<'a>,
+    name: Cow<'a, str>,
+    type_: InputType,
+    value: Option<String>,
+    placeholder: Cow<'a, str>,
+    error: Option<Cow<'a, str>>,
+    required: bool,
 }
 
 impl<'a> InputTag<'a> {
-    pub fn new(name: Cow<'a, str>, type_: InputType) -> Self {
-        let mut tag = Self::default();
-        tag.name = name;
-        tag.type_ = type_;
-        tag
-    }
-    fn default() -> Self {
-        Self {
-            attributes: BasicAttributes::default(),
-            name: Cow::default(),
-            type_: InputType::default(),
-            value: None,
-            placeholder: Cow::default(),
-            error: None,
-            required: false,
-        }
+    pub fn new(attributes: BasicAttributes<'a>,
+    name: Cow<'a, str>,
+    type_: InputType,
+    value: Option<String>,
+    placeholder: Cow<'a, str>,
+    error: Option<Cow<'a, str>>,
+    required: bool,) -> Self {
+        Self { attributes, name, type_, value, placeholder, error, required }
     }
 }
 
@@ -112,7 +105,9 @@ impl<'a> fmt::Display for FormTag<'a> {
     }
 }
 
+#[derive(Default)]
 pub enum ChildTag {
+    #[default]
     Label,
     P,
     Span,
@@ -128,10 +123,19 @@ impl fmt::Display for ChildTag {
     }
 }
 
+#[derive(Default)]
 pub struct GeneralChildTag<'a> {
     tag: ChildTag,
     attributes: BasicAttributes<'a>,
     value: String,
+}
+
+impl<'a> GeneralChildTag<'a> {
+    pub fn new(tag: ChildTag,
+        attributes: BasicAttributes<'a>,
+        value: String,) -> Self {
+        Self { tag, attributes, value }
+    }
 }
 
 impl<'a> fmt::Display for GeneralChildTag<'a> {
@@ -166,6 +170,14 @@ pub struct GeneralParentTag<'a> {
     children: Vec<HtmlTag<'a>>,
 }
 
+impl<'a> GeneralParentTag<'a> {
+    pub fn new(tag: ParentTag,
+        attributes: BasicAttributes<'a>,
+        children: Vec<HtmlTag<'a>>,) -> Self {
+        Self { tag, attributes, children }
+    }
+}
+
 impl<'a> fmt::Display for GeneralParentTag<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<{} {}>", self.tag, self.attributes,)?;
@@ -176,6 +188,7 @@ impl<'a> fmt::Display for GeneralParentTag<'a> {
     }
 }
 
+#[derive(Default)]
 pub struct BasicAttributes<'a> {
     id: Cow<'a, str>,
     class: Cow<'a, str>,
@@ -185,14 +198,6 @@ pub struct BasicAttributes<'a> {
 impl<'a> BasicAttributes<'a> {
     pub fn new(id: Cow<'a, str>, class: Cow<'a, str>, style: Cow<'a, str>) -> Self {
         Self { id, class, style }
-    }
-
-    fn default() -> Self {
-        Self {
-            id: Cow::default(),
-            class: Cow::default(),
-            style: Cow::default(),
-        }
     }
 }
 

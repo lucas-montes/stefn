@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 
@@ -7,6 +9,7 @@ use crate::{
     config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
     sessions::Sessions,
+    AppError,
 };
 
 #[derive(Clone)]
@@ -58,8 +61,19 @@ impl WebsiteState {
     pub fn events_broker(&self) -> &Broker {
         &self.shared.events_broker
     }
+
     pub fn ips_database(&self) -> &IpsDatabase {
         &self.shared.ips_database.as_ref().unwrap()
+    }
+
+    pub fn get_country_code_from_ip(&self, addr: &SocketAddr) -> Result<&str, AppError> {
+        if let Some(ips_database) = &self.shared.ips_database {
+            if addr.ip().is_loopback() {
+                return Ok("ES");
+            }
+            return ips_database.get_country_code_from_ip(addr);
+        }
+        Err(AppError::IpDatabaseNotEnabled)
     }
 
     pub fn config(&self) -> &WebsiteConfig {

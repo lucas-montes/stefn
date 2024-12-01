@@ -59,10 +59,7 @@ impl IpsDatabase {
         Self { storage }
     }
 
-    pub fn get_country_code_from_ip(&self, addr: SocketAddr) -> Result<&str, AppError> {
-        if addr.ip().is_loopback() {
-            return Ok("ES");
-        }
+    pub fn get_country_code_from_ip(&self, addr: &SocketAddr) -> Result<&str, AppError> {
         self.storage
             .as_ref()
             .unwrap()

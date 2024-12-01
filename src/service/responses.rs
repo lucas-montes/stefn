@@ -66,6 +66,7 @@ pub enum AppError {
     //
     IpError(MaxMindDBError),
     IpDataNotFound,
+    IpDatabaseNotEnabled,
     //
     Custom(StatusCode, String),
 }
@@ -93,7 +94,7 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
             }
             AppError::WrongPassword(_err) => {
-                (StatusCode::NOT_FOUND, "Contraseña incorrecta".to_owned())
+                (StatusCode::NOT_FOUND, "Contraseña incorrecta".into())
             }
             //
             AppError::JsonEnumDeserialization(err) => (StatusCode::BAD_REQUEST, err.to_string()),
@@ -104,10 +105,14 @@ impl IntoResponse for AppError {
 
             AppError::RoleError => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
 
-            AppError::DoesNotExist => (StatusCode::NOT_FOUND, "Not found".to_owned()),
+            AppError::DoesNotExist => (StatusCode::NOT_FOUND, "Not found".into()),
 
             AppError::IpError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
-            AppError::IpDataNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "Ip wrong".to_owned()),
+            AppError::IpDataNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "Ip wrong".into()),
+            AppError::IpDatabaseNotEnabled => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Ip database not enabled".into(),
+            ),
 
             AppError::Custom(status, message) => (status, message),
         };

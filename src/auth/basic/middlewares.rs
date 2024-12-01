@@ -45,7 +45,10 @@ pub async fn sessions_middleware(
     let session = match current_session {
         Some(session) => session,
         None => {
-            let country = state.ips_database().get_country_code_from_ip(addr)?;
+            //TODO: how to handle no ip database
+            let country = state
+                .get_country_code_from_ip(&addr)
+                .unwrap_or("No-countries");
             let config = state.config();
 
             sessions

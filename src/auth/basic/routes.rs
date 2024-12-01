@@ -22,8 +22,8 @@ pub struct Params {
 
 pub async fn login_user(
     state: State<WebsiteState>,
-    session: Extension<Session>,
-    Query(params): Query<Params>,
+    Extension(session): Extension<Session>,
+    params: Query<Params>,
     input: Form<LoginForm>,
 ) -> Result<Response, AppError> {
     let user = find_user_by_email(&state.database(), &input.email).await?;
@@ -33,7 +33,7 @@ pub async fn login_user(
     let sessions = state.sessions();
 
     sessions
-        .reuse_current_as_new_one(session.0, user.pk, user.groups)
+        .reuse_current_as_new_one(session, user.pk, user.groups)
         .await?;
 
     let redirect = params.next.as_ref().unwrap_or(&config.login_redirect_to);

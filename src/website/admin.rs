@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use askama::Template;
 use axum::{
     async_trait,
-    extract::{FromRef, Path, State},
+    extract::{Path, State},
     response::Redirect,
     routing::get,
     Form, Router,
@@ -17,13 +17,13 @@ use crate::{
 };
 
 use super::{
-    forms::{HtmlTag, ToForm},
+    html::{HtmlTag, ToForm},
     seo::Meta,
 };
 
 #[derive(Template)]
-#[template(path = "index.html")]
-pub struct IndexTemplate<'a> {
+#[template(path = "admin/list.html")]
+pub struct AdminListTemplate<'a> {
     meta: Meta<'a>,
 }
 
@@ -41,8 +41,9 @@ where
 {
     const PATH: &str = "";
     type Create: Send + DeserializeOwned + Serialize + Default + ToForm;
+    // TODO: try to hide the sqlix types
     type Update: Send + DeserializeOwned + ToForm + Unpin + for<'r> sqlx::FromRow<'r, SqliteRow>;
-    type Read: Send;
+    type Read: Send + for<'r> sqlx::FromRow<'r, SqliteRow>;
 
     fn entity_name() -> String {
         std::any::type_name::<Self>()
@@ -77,7 +78,7 @@ where
             .with_state(state)
     }
 
-    async fn list<'a>() -> IndexTemplate<'a> {
+    async fn list<'a>() -> AdminListTemplate<'a> {
         let meta = Meta::new(
             "list all objects".into(),
             "elerem mola".into(),
@@ -86,7 +87,7 @@ where
             "elerem.com".into(),
             "imafge.com".into(),
         );
-        IndexTemplate { meta }
+        AdminListTemplate { meta }
     }
 
     async fn post(Form(payload): Form<Self::Create>) -> Result<Redirect, AppError> {

@@ -93,6 +93,12 @@ impl<'a> FormTag<'a> {
         self.method = Cow::Borrowed(method);
         self
     }
+
+    pub fn add_button(mut self, button:HtmlTag<'a> )->Self{
+        self.children.push(button);
+        self
+    }
+
     fn default() -> Self {
         Self {
             action: Cow::default(),
@@ -127,6 +133,8 @@ pub enum ChildTag {
     Label,
     P,
     Span,
+    Th,
+    Td
 }
 
 impl fmt::Display for ChildTag {
@@ -135,40 +143,56 @@ impl fmt::Display for ChildTag {
             Self::Label => write!(f, "label"),
             Self::P => write!(f, "p"),
             Self::Span => write!(f, "span"),
+            Self::Th => write!(f, "th"),
+            Self::Td => write!(f, "td"),
         }
     }
 }
 
 #[derive(Default)]
 pub struct GeneralChildTag<'a> {
-    tag: ChildTag,
+    tag: Option<ChildTag>,
     attributes: BasicAttributes<'a>,
-    value: String,
+    value: Cow<'a, str>,
 }
 
 impl<'a> GeneralChildTag<'a> {
-    pub fn new(tag: ChildTag,
+    pub fn new(tag: Option<ChildTag>,
         attributes: BasicAttributes<'a>,
-        value: String,) -> Self {
+        value: Cow<'a, str>,) -> Self {
         Self { tag, attributes, value }
+    }
+
+    pub fn empty(value: Cow<'a, str>)->Self{
+        Self { tag:None, attributes: BasicAttributes::default(), value }
     }
 }
 
 impl<'a> fmt::Display for GeneralChildTag<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "<{tag} {attributes}>{value}</{tag}>",
-            tag = self.tag,
-            attributes = self.attributes,
-            value = self.value,
-        )
+        match &self.tag {
+            Some(tag) => {write!(
+                f,
+                "<{tag} {attributes}>{value}</{tag}>",
+                tag = tag,
+                attributes = self.attributes,
+                value = self.value,
+            )},
+            None =>write!(
+                f,
+                "{value}",
+                value = self.value,
+            )
+        }
     }
 }
 
 pub enum ParentTag {
     Button,
     Div,
+    Thead,
+    Tbody,
+    Table
 }
 
 impl fmt::Display for ParentTag {
@@ -176,6 +200,9 @@ impl fmt::Display for ParentTag {
         match self {
             Self::Button => write!(f, "button"),
             Self::Div => write!(f, "div"),
+            Self::Thead => write!(f, "thead"),
+            Self::Tbody => write!(f, "tbody"),
+            Self::Table => write!(f, "table"),
         }
     }
 }
@@ -184,19 +211,37 @@ pub struct GeneralParentTag<'a> {
     tag: ParentTag,
     attributes: BasicAttributes<'a>,
     children: Vec<HtmlTag<'a>>,
+    type_: Option<Cow<'a, str>>
 }
 
 impl<'a> GeneralParentTag<'a> {
     pub fn new(tag: ParentTag,
         attributes: BasicAttributes<'a>,
         children: Vec<HtmlTag<'a>>,) -> Self {
-        Self { tag, attributes, children }
+        Self { tag, attributes, children, type_: None }
+    }
+
+    pub fn button(value: Cow<'a, str>, class: Cow<'a, str>)->Self{
+        let child =  GeneralChildTag::empty(value);
+        let mut attributes= BasicAttributes::default();
+        attributes.class = class;
+        Self { tag:ParentTag::Button, attributes, children:vec![HtmlTag::ChildTag(child)], type_: Some(Cow::Borrowed("button")) }
+    }
+
+    pub fn submit_button(value: Cow<'a, str>, class: Cow<'a, str>)->Self{
+        let mut button = Self::button(value, class);
+        button.type_ = Some(Cow::Borrowed("submit"));
+        button
     }
 }
 
 impl<'a> fmt::Display for GeneralParentTag<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<{} {}>", self.tag, self.attributes,)?;
+        write!(f, "<{} {}", self.tag, self.attributes)?;
+        if let Some(type_) = &self.type_ {
+            write!(f, " type_=\"{}\"", type_)?;
+        }
+        write!(f, ">")?;
         for child in &self.children {
             write!(f, "{}", child)?;
         }
@@ -254,8 +299,20 @@ impl<'a> fmt::Display for HtmlTag<'a> {
 }
 
 pub trait ToForm {
-    fn to_form<'a>(&self) -> HtmlTag<'a>;
-    fn to_empty_form<'a>() -> HtmlTag<'a>;
+    fn form_button<'a>() -> HtmlTag<'a>;
+
+    fn raw_form<'a>(&self) -> FormTag<'a>;
+    fn raw_empty_form<'a>() -> FormTag<'a>;
+
+    fn to_form<'a>(&self) -> HtmlTag<'a> {
+        let form = self.raw_form().add_button(Self::form_button());
+        HtmlTag::Form(form)
+    }
+
+    fn to_empty_form<'a>() -> HtmlTag<'a> {
+        let form = Self::raw_empty_form().add_button(Self::form_button());
+        HtmlTag::Form(form)
+    }
 }
 
 #[cfg(test)]
@@ -274,7 +331,7 @@ mod tests {
         let result = HtmlTag::Form(FormTag::new(vec![children]));
         assert_eq!(
             &result.to_string(), 
-            "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><input id=\"\" class=\"\" style=\"\" name=\"\" type_=\"text\" value=\"\" placeholder=\"\"/></form>"
+            "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><input id=\"\" class=\"\" style=\"\" name=\"\" type_=\"text\" value=\"\" placeholder=\"\" /></form>"
         );
     }
 }

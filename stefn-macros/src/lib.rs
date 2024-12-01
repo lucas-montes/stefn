@@ -2,14 +2,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, LitStr};
 
-#[proc_macro_derive(ToBootstrapForm, attributes(html))]
-pub fn to_bootstrap_form(input: TokenStream) -> TokenStream {
-    to_html_form_derive::<BootstrapStyle>(input)
-}
-
 #[proc_macro_derive(ToForm, attributes(html))]
 pub fn to_regular_form(input: TokenStream) -> TokenStream {
-    to_html_form_derive::<RegularStyle>(input)
+    to_html_form_derive::<BootstrapStyle>(input)
 }
 
 fn to_html_form_derive<S: FormStyle>(input: TokenStream) -> TokenStream {
@@ -31,14 +26,21 @@ fn to_html_form_derive<S: FormStyle>(input: TokenStream) -> TokenStream {
         .map(|field| process_field::<S>(&field, false))
         .collect();
 
+    let button_class = S::button_form_class();
+    let button_value = S::button_form_value();
+
     let expanded = quote! {
-        impl stefn::forms::ToForm for #struct_name {
-            fn to_form<'a>(&self) -> stefn::forms::HtmlTag<'a> {
-                stefn::forms::HtmlTag::Form(stefn::forms::FormTag::new(vec![#(#full_fields),*]))
+        impl stefn::html::ToForm for #struct_name {
+            fn form_button<'a>() -> stefn::html::HtmlTag<'a> {
+                stefn::html::HtmlTag::ParentTag(stefn::html::GeneralParentTag::submit_button(#button_value.into(), #button_class.into()))
             }
 
-            fn to_empty_form<'a>() -> stefn::forms::HtmlTag<'a> {
-                stefn::forms::HtmlTag::Form(stefn::forms::FormTag::new(vec![#(#empty_fields),*]))
+            fn raw_form<'a>(&self) -> stefn::html::FormTag<'a> {
+                stefn::html::FormTag::new(vec![#(#full_fields),*])
+            }
+
+            fn raw_empty_form<'a>() -> stefn::html::FormTag<'a> {
+                stefn::html::FormTag::new(vec![#(#empty_fields),*])
             }
         }
     };
@@ -69,14 +71,12 @@ fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStrea
 }
 
 trait FormStyle {
-    fn div_class() -> &'static str;
-    fn input_class() -> &'static str;
-    fn label_class() -> &'static str;
-}
-
-struct BootstrapStyle;
-
-impl FormStyle for BootstrapStyle {
+    fn button_form_class() -> &'static str {
+        "btn btn-primary"
+    }
+    fn button_form_value() -> &'static str {
+        "Save"
+    }
     fn div_class() -> &'static str {
         "mb-3"
     }
@@ -90,21 +90,9 @@ impl FormStyle for BootstrapStyle {
     }
 }
 
-struct RegularStyle;
+struct BootstrapStyle;
 
-impl FormStyle for RegularStyle {
-    fn div_class() -> &'static str {
-        "default-div"
-    }
-
-    fn input_class() -> &'static str {
-        "default-input"
-    }
-
-    fn label_class() -> &'static str {
-        "default-label"
-    }
-}
+impl FormStyle for BootstrapStyle {}
 
 #[derive(Default)]
 struct FormFieldAttributes {
@@ -154,7 +142,7 @@ impl FormFieldAttributes {
 
     fn resolve_type(&self) -> proc_macro2::TokenStream {
         self.type_.as_ref().map_or_else(
-            || quote! { stefn::forms::InputType::Text },
+            || quote! { stefn::html::InputType::Text },
             |t| {
                 let type_str = t.value();
                 quote! { std::str::FromStr::from_str(#type_str).unwrap() }
@@ -235,17 +223,17 @@ impl FormFieldAttributes {
         let label_class = self.resolve_label_class::<S>();
 
         quote! {
-            stefn::forms::HtmlTag::ParentTag(stefn::forms::GeneralParentTag::new(
-                stefn::forms::ParentTag::Div,
-                stefn::forms::BasicAttributes::new(#div_id, #div_class, #style),
+            stefn::html::HtmlTag::ParentTag(stefn::html::GeneralParentTag::new(
+                stefn::html::ParentTag::Div,
+                stefn::html::BasicAttributes::new(#div_id, #div_class, #style),
                 vec![
-                    stefn::forms::HtmlTag::ChildTag(stefn::forms::GeneralChildTag::new(
-                        stefn::forms::ChildTag::Label,
-                        stefn::forms::BasicAttributes::new(#label_id, #label_class, #style),
+                    stefn::html::HtmlTag::ChildTag(stefn::html::GeneralChildTag::new(
+                        Some(stefn::html::ChildTag::Label),
+                        stefn::html::BasicAttributes::new(#label_id, #label_class, #style),
                         #name,
                     )),
-                    stefn::forms::HtmlTag::Input(stefn::forms::InputTag::new(
-                        stefn::forms::BasicAttributes::new(#input_id, #input_class, #style),
+                    stefn::html::HtmlTag::Input(stefn::html::InputTag::new(
+                        stefn::html::BasicAttributes::new(#input_id, #input_class, #style),
                         #name,
                         #type_,
                         #value,

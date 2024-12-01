@@ -26,7 +26,6 @@ pub trait Manager {
     ) -> Result<Option<M>, AppError> {
         let mut tx = database
             .get_connection()
-            .await
             .begin()
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))?;
@@ -54,7 +53,6 @@ pub trait Manager {
     async fn delete_by(database: &Database, clause: Where) -> Result<(), AppError> {
         let mut tx = database
             .get_connection()
-            .await
             .begin()
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))?;
@@ -68,5 +66,23 @@ pub trait Manager {
         }
         Ok(())
     }
+
+    async fn filter(database: &Database, clause: Where) -> Result<(), AppError> {
+        let mut tx = database
+            .get_connection()
+            .begin()
+            .await
+            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+        if let Where::Pk(pk) = clause {
+            sqlx::query("DELETE FROM $1 WHERE pk = $2;")
+                .bind(Self::TABLE)
+                .bind(pk)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+        }
+        Ok(())
+    }
+
     async fn create(database: &Database) {}
 }

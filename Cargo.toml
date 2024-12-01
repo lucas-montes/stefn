@@ -8,7 +8,7 @@ authors = ["Lucas Montes <lluc23@hotmail.com>"]
 description = "An opinionated and blazingly fast meta framework"
 
 [dependencies]
-stefn-macros = { path = "./stefn-macros", version = "0.1.0" }
+stefn-macros = { path = "./stefn-macros" }
 
 tokio = { version = "1.38.0", features = ["full"] }
 

@@ -1,5 +1,5 @@
 mod admin;
-pub mod forms;
+pub mod html;
 mod seo;
 
 pub use admin::Admin;

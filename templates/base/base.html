@@ -2,9 +2,13 @@
 <html lang="es">
 
 <head>
-  <script src="https://unpkg.com/htmx.org@2.0.3"
+  {% block extra_head %}
+  <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"
+    integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8=" crossorigin="anonymous"></script>
+  <script async src="https://unpkg.com/htmx.org@2.0.3"
     integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq"
     crossorigin="anonymous"></script>
+  {% endblock extra_head %}
 
   {% block meta %}{% include "base/meta.html" %}{% endblock meta %}
   {% block css %}
@@ -19,8 +23,9 @@
   <!-- [Template CSS Files] -->
   <link rel="stylesheet" href="/dist/assets/css/style.css" id="main-style-link">
   <link rel="stylesheet" href="/dist/assets/css/style-preset.css">
+
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.css" />
   {% endblock css %}
-  {% block extra_head %}{% endblock extra_head %}
 </head>
 
 <body>

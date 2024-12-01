@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use maxminddb::geoip2;
-use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, SqlitePool};
+use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Sqlite, SqlitePool, Transaction};
 
 use crate::AppError;
 
@@ -30,8 +30,15 @@ impl Database {
             .expect("Migrations failed");
     }
 
-    pub async fn get_connection(&self) -> &SqlitePool {
+    pub fn get_connection(&self) -> &SqlitePool {
         &self.storage
+    }
+
+    pub async fn start_transaction(&self) -> Result<Transaction<'_, Sqlite>, AppError> {
+        self.get_connection()
+            .begin()
+            .await
+            .map_err(|e| AppError::custom_internal(&e.to_string()))
     }
 }
 

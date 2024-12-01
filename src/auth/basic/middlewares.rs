@@ -47,7 +47,6 @@ pub async fn sessions_middleware(
         None => {
             let country = state.ips_database().get_country_code_from_ip(addr)?;
             let config = state.config();
-            let sessions = state.sessions();
 
             sessions
                 .create_session(

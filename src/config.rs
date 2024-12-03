@@ -59,6 +59,8 @@ pub struct WebsiteConfig {
     pub session_expiration: i64,
     pub login_redirect_to: String,
     pub csrf_cookie_name: String,
+    pub google_client_id: String,
+    pub google_client_secret: String,
 }
 
 impl ServiceConfig for WebsiteConfig {
@@ -68,12 +70,14 @@ impl ServiceConfig for WebsiteConfig {
             port: 8000,
             domain: "test.com".into(),
             allowed_origins: "*".into(),
-            session_key: "session_key".to_owned(),
-            sessions_db: "./test-sessions.sqlite".to_owned(),
-            session_cookie_name: "session_id".to_owned(),
-            csrf_cookie_name: "csrf_token".to_owned(),
+            session_key: "session_key".into(),
+            sessions_db: "./test-sessions.sqlite".into(),
+            session_cookie_name: "session_id".into(),
+            csrf_cookie_name: "csrf_token".into(),
             session_expiration: 30,
-            login_redirect_to: "admin".to_owned(),
+            login_redirect_to: "admin".into(),
+            google_client_id: "".into(),
+            google_client_secret: "".into(),
         }
     }
 

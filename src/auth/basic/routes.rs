@@ -26,7 +26,9 @@ pub async fn login_user(
     params: Query<Params>,
     input: Form<LoginForm>,
 ) -> Result<Response, AppError> {
-    let user = find_user_by_email(&state.database(), &input.email).await?;
+    let user = find_user_by_email(&state.database(), &input.email)
+        .await?
+        .ok_or(AppError::DoesNotExist)?;
     verify_password(&input.password, &user.password)?;
 
     let config = state.config();

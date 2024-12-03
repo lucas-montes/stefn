@@ -84,5 +84,22 @@ pub trait Manager {
         Ok(())
     }
 
-    async fn create(database: &Database) {}
+    async fn create(database: &Database) {
+        //TODO: finish
+        let fields = vec![""].join(",");
+        let values = (1..fields.len())
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+        let q = format!(
+            "INSERT INTO {table} ({fields}) VALUES ({values});",
+            table = Self::TABLE
+        );
+        sqlx::query(&q)
+            .execute(database.get_connection())
+            .await
+            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .unwrap();
+    }
 }

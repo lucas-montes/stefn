@@ -144,10 +144,7 @@ impl UserSession {
     }
 
     fn get_token_data(&self) -> String {
-        format!(
-            "{}-{}-{}",
-            self.session_id, self.country, self.last_accessed
-        )
+        format!("{}-{}", self.session_id, self.last_accessed)
     }
 
     fn new_session_id(&mut self) -> &mut Self {

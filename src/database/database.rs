@@ -21,6 +21,16 @@ impl Database {
         }
     }
 
+    pub fn stub() -> Self {
+        let database_config = SqliteConnectOptions::from_str("test-database.sqlite")
+            .expect("Cannot connect to database")
+            .create_if_missing(true);
+
+        Self {
+            storage: SqlitePool::connect_lazy_with(database_config),
+        }
+    }
+
     pub async fn run_migrations(&self) {
         Migrator::new(std::path::Path::new("./migrations/principal"))
             .await
@@ -41,6 +51,93 @@ impl Database {
             .map_err(|e| AppError::custom_internal(&e.to_string()))
     }
 }
+
+pub struct TestDatabase(Database);
+
+impl TestDatabase {
+    pub async fn setup() -> Self {
+        let database = Database::stub();
+        database.run_migrations().await;
+        Self(database)
+    }
+
+    pub fn database(&self) -> &Database {
+        &self.0
+    }
+
+    pub fn get_connection(&self) -> &SqlitePool {
+        &self.0.storage
+    }
+
+    pub async fn start_transaction(&self) -> Result<Transaction<'_, Sqlite>, AppError> {
+        self.get_connection()
+            .begin()
+            .await
+            .map_err(|e| AppError::custom_internal(&e.to_string()))
+    }
+
+    pub async fn run_test_migrations(&self, path: &str) {
+        Migrator::new(std::path::Path::new(path))
+            .await
+            .expect("Where are the migrations?")
+            .run(&self.0.storage)
+            .await
+            .expect("Migrations failed");
+    }
+
+    pub async fn clean_database(&self) -> Result<(), AppError> {
+        let mut tx = self.0.start_transaction().await?;
+
+        // Query to retrieve all user-defined tables
+        let tables: Vec<String> = sqlx::query_scalar(
+            r#"
+            SELECT name 
+            FROM sqlite_master 
+            WHERE type='table' AND name NOT LIKE 'sqlite_%';
+            "#,
+        )
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| AppError::custom_internal(&format!("Failed to fetch table names: {}", e)))?;
+
+        // Delete all data from tables
+        for table in &tables {
+            sqlx::query(&format!("DELETE FROM {};", table))
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    AppError::custom_internal(&format!("Failed to clean table {}: {}", table, e))
+                })?;
+        }
+
+        // Reset auto-increment counters
+        for table in &tables {
+            sqlx::query(&format!(
+                "DELETE FROM sqlite_sequence WHERE name = '{}';",
+                table
+            ))
+            .execute(&mut *tx)
+            .await
+            .ok(); // Ignore errors if the table has no auto-increment sequence
+        }
+
+        tx.commit()
+            .await
+            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+// impl Drop for TestDatabase {
+//     fn drop(&mut self) {
+//         tokio::runtime::Handle::current().spawn_blocking(async {
+//             clean_database(&self.database).await.unwrap_or_else(|e| {
+//                 eprintln!("Failed to clean database during teardown: {:?}", e);
+//             });
+//         })
+//     }
+// }
 
 #[derive(Clone)]
 pub struct IpsDatabase {

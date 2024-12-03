@@ -23,7 +23,7 @@ pub async fn login_required_middleware(
         request.extensions_mut().insert(session);
         return Ok(next.run(request).await);
     }
-    let next = format!("login?next={}", request.uri());
+    let next = format!("/?next={}", request.uri());
     Ok(Redirect::to(&next).into_response())
 }
 
@@ -49,7 +49,6 @@ pub async fn sessions_middleware(
             let country = state
                 .get_country_code_from_ip(&addr)
                 .unwrap_or("No-countries");
-            let config = state.config();
 
             sessions
                 .create_session(

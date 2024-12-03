@@ -7,8 +7,11 @@ pub struct User {
     pub groups: String,
 }
 
-pub async fn find_user_by_email(database: &Database, email: &str) -> Result<User, AppError> {
-    let result: Option<User> = sqlx::query_as(
+pub async fn find_user_by_email(
+    database: &Database,
+    email: &str,
+) -> Result<Option<User>, AppError> {
+    sqlx::query_as(
         r#"
             SELECT emails.user_pk as pk, users.password, GROUP_CONCAT(groups.name, ', ') AS groups
             FROM emails
@@ -22,6 +25,5 @@ pub async fn find_user_by_email(database: &Database, email: &str) -> Result<User
     .bind(email)
     .fetch_optional(database.get_connection())
     .await
-    .map_err(|e| AppError::custom_internal(&e.to_string()))?;
-    result.ok_or(AppError::DoesNotExist)
+    .map_err(|e| AppError::custom_internal(&e.to_string()))
 }

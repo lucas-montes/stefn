@@ -40,7 +40,7 @@ pub async fn set_session_cookies(
         .http_only(true)
         .build();
 
-    headers.insert(
+    headers.append(
         SET_COOKIE,
         HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
             .map_err(|e| AppError::custom_internal(&e.to_string()))?,
@@ -54,7 +54,7 @@ pub async fn set_session_cookies(
         .http_only(true)
         .build();
 
-    headers.insert(
+    headers.append(
         SET_COOKIE,
         HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
             .map_err(|e| AppError::custom_internal(&e.to_string()))?,

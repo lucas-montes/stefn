@@ -3,7 +3,7 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 use axum::http::{header::SET_COOKIE, HeaderValue};
-use cookie::time::Duration;
+use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;
 
 use crate::{
@@ -37,7 +37,8 @@ pub async fn set_session_cookies(
         .path("/")
         .max_age(Duration::days(config.session_expiration))
         .secure(true)
-        .http_only(true)
+        .http_only(false)
+        .same_site(SameSite::Lax)
         .build();
 
     headers.append(
@@ -52,6 +53,7 @@ pub async fn set_session_cookies(
         .max_age(Duration::days(config.session_expiration))
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::Lax)
         .build();
 
     headers.append(

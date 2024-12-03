@@ -89,6 +89,7 @@ impl AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         tracing::error!("{:?}", self);
+
         let (status, message) = match self {
             AppError::ErrorHashingPassword(err) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())

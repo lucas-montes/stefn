@@ -8,9 +8,9 @@ use crate::{
     broker::Broker,
     config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
+    service::AppError,
     sessions::Sessions,
     website::Locale,
-    AppError,
 };
 
 #[derive(Clone)]

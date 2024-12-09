@@ -8,7 +8,7 @@ use oauth2::{
 
 use reqwest::Url;
 
-use crate::{AppError, Database, WebsiteConfig};
+use crate::{config::WebsiteConfig, database::Database, service::AppError};
 
 pub struct OauthTokenResponse(pub StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>);
 

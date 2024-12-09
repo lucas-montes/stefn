@@ -1,4 +1,4 @@
-use crate::AppError;
+use crate::service::AppError;
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};

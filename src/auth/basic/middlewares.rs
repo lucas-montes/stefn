@@ -8,7 +8,7 @@ use axum_extra::{headers::Cookie, TypedHeader};
 use std::net::SocketAddr;
 
 use super::services::set_session_cookies;
-use crate::{sessions::Session, AppError, Database, WebsiteState};
+use crate::{database::Database, service::AppError, sessions::Session, state::WebsiteState};
 
 pub async fn login_required_middleware(
     session: Extension<Session>,

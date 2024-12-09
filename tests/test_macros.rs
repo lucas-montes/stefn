@@ -1,4 +1,4 @@
-use stefn::{html::ToForm, ToForm};
+use stefn::ToForm;
 
 #[test]
 fn test_to_form_with_all_attributes() {

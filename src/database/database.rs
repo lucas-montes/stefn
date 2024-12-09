@@ -3,7 +3,7 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use maxminddb::geoip2;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Sqlite, SqlitePool, Transaction};
 
-use crate::AppError;
+use crate::service::AppError;
 
 #[derive(Clone)]
 pub struct Database {

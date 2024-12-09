@@ -3,7 +3,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, SqliteConnection};
 
-use crate::{AppError, Database};
+use crate::{database::Database, service::AppError};
 
 #[derive(Clone)]
 pub enum Group {

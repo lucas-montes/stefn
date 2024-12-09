@@ -5,8 +5,7 @@ use tokio::{net::TcpListener, signal};
 
 use crate::{
     config::{APIConfig, ServiceConfig, WebsiteConfig},
-    state::SharedState,
-    APIState, WebsiteState,
+    state::{APIState, SharedState, WebsiteState},
 };
 
 use super::get_router;

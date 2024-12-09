@@ -1,4 +1,4 @@
-use crate::{AppError, Database};
+use crate::{database::Database, service::AppError};
 
 #[derive(Debug, sqlx::FromRow)]
 pub struct User {

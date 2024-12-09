@@ -9,8 +9,9 @@ use serde::Deserialize;
 
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
+    service::AppError,
     sessions::Session,
-    AppError, WebsiteState,
+    state::WebsiteState,
 };
 
 use super::find_user_by_email;

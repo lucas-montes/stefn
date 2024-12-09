@@ -5,7 +5,7 @@ use sqlx::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::AppError;
+use crate::service::AppError;
 
 #[derive(Clone)]
 pub struct Broker {

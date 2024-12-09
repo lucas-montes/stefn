@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::AppError;
+use crate::service::AppError;
 
 #[derive(Deserialize)]
 pub struct GoogleUserInfo {

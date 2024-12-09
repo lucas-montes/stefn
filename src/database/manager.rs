@@ -1,7 +1,7 @@
 use axum::async_trait;
 use sqlx::{sqlite::SqliteRow, QueryBuilder};
 
-use crate::AppError;
+use crate::service::AppError;
 
 use super::Database;
 

@@ -1,6 +1,9 @@
 use crate::{
+    database::Database,
     models::{EmailAccount, Group, User},
-    AppError, Database, Session, Sessions, WebsiteState,
+    service::AppError,
+    sessions::Session,
+    state::WebsiteState,
 };
 
 use super::{infrastructure::GoogleUserInfo, oauth::OauthTokenResponse};

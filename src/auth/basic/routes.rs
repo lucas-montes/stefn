@@ -1,43 +1,46 @@
+use askama::Template;
 use axum::{
     extract::{Query, State},
-    response::{IntoResponse, Redirect, Response},
-    Extension, Form,
+    response::Redirect,
+    routing::get,
+    Extension, Form, Router,
 };
-use serde::Deserialize;
 
-use crate::{sessions::Session, AppError, WebsiteState};
+use crate::{sessions::Session, AppError, Meta, WebsiteState};
 
-use super::{infrastructures::find_user_by_email, services::verify_password};
+use super::services::{handle_ingress, IngressForm, IngressParams};
 
-#[derive(Deserialize)]
-pub struct LoginForm {
-    email: String,
-    password: String,
+pub fn routes(state: WebsiteState) -> Router<WebsiteState> {
+    Router::new()
+        .route("/ingress", get(ingress).post(post_ingress))
+        .with_state(state)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct Params {
-    next: Option<String>,
+#[derive(Template)]
+#[template(path = "auth/ingress.html")]
+struct IngressTemplate<'a> {
+    meta: Meta<'a>,
 }
 
-pub async fn login_user(
+pub async fn ingress<'a>() -> IngressTemplate<'a> {
+    let meta = Meta::new(
+        "Favoris".into(),
+        "Tes favoris".into(),
+        "smartlink,b2b".into(),
+        "Lucas Montes".into(),
+        "smartlink.ai".into(),
+        "image.com".into(),
+    );
+    IngressTemplate { meta }
+}
+
+pub async fn post_ingress(
     state: State<WebsiteState>,
     Extension(session): Extension<Session>,
-    params: Query<Params>,
-    input: Form<LoginForm>,
-) -> Result<Response, AppError> {
-    let user = find_user_by_email(&state.database(), &input.email)
-        .await?
-        .ok_or(AppError::DoesNotExist)?;
-    verify_password(&input.password, &user.password)?;
-
-    let config = state.config();
-    let sessions = state.sessions();
-
-    sessions
-        .reuse_current_as_new_one(session, user.pk, user.groups)
-        .await?;
-
-    let redirect = params.next.as_ref().unwrap_or(&config.login_redirect_to);
-    Ok(Redirect::to(&redirect).into_response())
+    params: Query<IngressParams>,
+    input: Form<IngressForm>,
+) -> Result<Redirect, AppError> {
+    handle_ingress(&state, session, &params, &input)
+        .await
+        .map(|r| Redirect::to(r))
 }

@@ -1,5 +1,3 @@
-use std::net::SocketAddr;
-
 use axum::{
     extract::{ConnectInfo, Request, State},
     middleware::Next,
@@ -7,10 +5,10 @@ use axum::{
     Extension,
 };
 use axum_extra::{headers::Cookie, TypedHeader};
-
-use crate::{sessions::Session, AppError, WebsiteState};
+use std::net::SocketAddr;
 
 use super::services::set_session_cookies;
+use crate::{sessions::Session, AppError, Database, WebsiteState};
 
 pub async fn login_required_middleware(
     session: Extension<Session>,
@@ -18,6 +16,7 @@ pub async fn login_required_middleware(
     next: Next,
 ) -> Result<Response, AppError> {
     //TODO: validate that the cookie is correct with hmac
+    // TODO: check that the users exists and other validations
 
     if session.is_authenticated().await {
         request.extensions_mut().insert(session);

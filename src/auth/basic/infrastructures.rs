@@ -6,6 +6,7 @@ pub struct User {
     pub password: String,
     pub groups: String,
 }
+//TODO: why two users
 
 pub async fn find_user_by_email(
     database: &Database,

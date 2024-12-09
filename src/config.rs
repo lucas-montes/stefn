@@ -1,5 +1,6 @@
 use axum::http::HeaderValue;
 use menva::FromEnv;
+use oauth2::Scope;
 use std::{net::Ipv4Addr, str::FromStr};
 
 #[derive(Debug, Clone)]
@@ -61,6 +62,25 @@ pub struct WebsiteConfig {
     pub csrf_cookie_name: String,
     pub google_client_id: String,
     pub google_client_secret: String,
+    google_scopes: String,
+    captcha_public_key: String,
+    captcha_secrect_key: String,
+}
+
+impl WebsiteConfig {
+    pub fn google_scopes(&self) -> Vec<Scope> {
+        if self.google_scopes.is_empty() {
+            return vec![
+                Scope::new("https://www.googleapis.com/auth/userinfo.email".into()),
+                Scope::new("https://www.googleapis.com/auth/userinfo.profile".into()),
+            ];
+        } else {
+            self.google_scopes
+                .split(",")
+                .map(|s| Scope::new(s.into()))
+                .collect()
+        }
+    }
 }
 
 impl ServiceConfig for WebsiteConfig {
@@ -78,6 +98,9 @@ impl ServiceConfig for WebsiteConfig {
             login_redirect_to: "admin".into(),
             google_client_id: "".into(),
             google_client_secret: "".into(),
+            google_scopes: "scope1,scope2".into(),
+            captcha_public_key: "captcha_public_key".into(),
+            captcha_secrect_key: "captcha_secrect_key".into(),
         }
     }
 

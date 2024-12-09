@@ -5,12 +5,94 @@ use argon2::{
 use axum::http::{header::SET_COOKIE, HeaderValue};
 use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;
+use serde::Deserialize;
 
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
     sessions::Session,
-    AppError,
+    AppError, WebsiteState,
 };
+
+use super::find_user_by_email;
+
+#[derive(Deserialize)]
+pub enum IngressProcess {
+    Login,
+    Register,
+}
+
+#[derive(Deserialize)]
+pub struct IngressForm {
+    email: String,
+    password: String,
+    csrf_token: String,
+    process: IngressProcess,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IngressParams {
+    next: Option<String>,
+}
+
+pub async fn handle_ingress<'a>(
+    state: &'a WebsiteState,
+    session: Session,
+    params: &'a IngressParams,
+    input: &'a IngressForm,
+) -> Result<&'a str, AppError> {
+    match input.process {
+        IngressProcess::Login => login(&state, session, &params, &input).await,
+        IngressProcess::Register => register(&state, session, &params, &input).await,
+    }
+}
+
+pub async fn login<'a>(
+    state: &'a WebsiteState,
+    session: Session,
+    params: &'a IngressParams,
+    input: &'a IngressForm,
+) -> Result<&'a str, AppError> {
+    let redirect = params
+        .next
+        .as_ref()
+        .unwrap_or(&state.config().login_redirect_to);
+
+    let user = find_user_by_email(&state.database(), &input.email)
+        .await?
+        .ok_or(AppError::DoesNotExist)?;
+    verify_password(&input.password, &user.password)?;
+
+    let sessions = state.sessions();
+
+    sessions
+        .reuse_current_as_new_one(session, user.pk, user.groups)
+        .await?;
+
+    Ok(redirect)
+}
+pub async fn register<'a>(
+    state: &'a WebsiteState,
+    session: Session,
+    params: &'a IngressParams,
+    input: &'a IngressForm,
+) -> Result<&'a str, AppError> {
+    let redirect = params
+        .next
+        .as_ref()
+        .unwrap_or(&state.config().login_redirect_to);
+
+    let user = find_user_by_email(&state.database(), &input.email)
+        .await?
+        .ok_or(AppError::DoesNotExist)?;
+    verify_password(&input.password, &user.password)?;
+
+    state
+        .sessions()
+        .reuse_current_as_new_one(session, user.pk, user.groups)
+        .await?;
+
+    Ok(redirect)
+}
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);

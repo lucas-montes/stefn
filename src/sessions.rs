@@ -1,7 +1,7 @@
 use crate::AppError;
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha2::Sha256;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, SqlitePool};
 use std::{
@@ -22,6 +22,23 @@ impl Session {
         self.0.read().await.user_pk.is_some()
     }
 
+    pub async fn set_data<T: Serialize>(&self, data: &T) -> Result<(), AppError> {
+        //TODO: improve this
+        let mut storage = self.0.write().await;
+        storage.data =
+            Some(serde_json::to_vec(data).map_err(|e| AppError::custom_internal(&e.to_string()))?);
+        Ok(())
+    }
+
+    pub async fn get_data<T: DeserializeOwned>(&self) -> Result<T, AppError> {
+        serde_json::from_slice(self.0.read().await.data.as_ref().unwrap())
+            .map_err(|e| AppError::custom_internal(&e.to_string()))
+    }
+
+    pub async fn user_pk(&self) -> Option<i64> {
+        self.0.read().await.user_pk
+    }
+
     pub async fn id(&self) -> String {
         self.0.read().await.session_id.to_owned()
     }
@@ -29,10 +46,15 @@ impl Session {
     pub async fn csrf_token(&self) -> String {
         self.0.read().await.csrf_token.to_owned()
     }
+
+    pub async fn token_is_valid(&self, secret: &str, token: &str) -> bool {
+        generate_token(secret, &self.0.read().await.get_token_data()).eq(token)
+    }
 }
 
 #[derive(Clone)]
 pub struct Sessions(SqlitePool);
+//TODO: do we really need a second database?
 
 impl Sessions {
     pub fn new(sessions_db: &str) -> Self {
@@ -99,6 +121,7 @@ impl Sessions {
         user_pk: i64,
         groups: String,
     ) -> Result<(), AppError> {
+        //TODO: change this interface, take a struct as user
         session
             .0
             .write()
@@ -122,6 +145,7 @@ pub struct UserSession {
     data: Option<Vec<u8>>,
     country: String,
 }
+// TODO: replace data, user_pk and groups by a struct that would hold user info plus additional info
 
 impl UserSession {
     fn new(user_pk: Option<i64>, groups: String, country: &str, session_expiration: u64) -> Self {
@@ -147,6 +171,10 @@ impl UserSession {
         format!("{}-{}", self.session_id, self.last_accessed)
     }
 
+    fn token_is_valid(&self, secret: &str, token: &str) -> bool {
+        generate_token(secret, &self.get_token_data()).eq(token)
+    }
+
     fn new_session_id(&mut self) -> &mut Self {
         self.session_id = Uuid::now_v7().to_string();
         self
@@ -170,16 +198,6 @@ impl UserSession {
             .as_secs() as i64;
         self.last_accessed = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
         self
-    }
-
-    fn validate_token() {
-        fn calculate_hmac(secret: &str, data: &str) -> String {
-            let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-                .expect("HMAC can take key of any size");
-            mac.update(data.as_bytes());
-
-            hex::encode(mac.finalize().into_bytes())
-        }
     }
 
     async fn from_session_id(

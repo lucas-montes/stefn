@@ -1,6 +1,62 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, LitStr};
+use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, ItemStruct, LitStr};
+
+#[proc_macro_derive(CsrfProtected)]
+pub fn add_csrf_token_derive(input: TokenStream) -> TokenStream {
+    //TODO: make it work
+    let input = parse_macro_input!(input as DeriveInput);
+
+    // Extract the struct's identifier (name)
+    let struct_name = input.ident;
+
+    // Extract fields from the struct
+    let fields = if let Data::Struct(data_struct) = &input.data {
+        match &data_struct.fields {
+            Fields::Named(fields_named) => &fields_named.named,
+            _ => panic!("AddCsrfToken can only be used with named structs"),
+        }
+    } else {
+        panic!("AddCsrfToken can only be used with structs");
+    };
+
+    // Generate the expanded fields: existing fields + csrf_token
+    let mut expanded_fields = quote! {};
+    for field in fields {
+        let field_name = &field.ident;
+        let field_type = &field.ty;
+        expanded_fields = quote! {
+            #expanded_fields
+            #field_name: #field_type,
+        };
+    }
+
+    // Add the csrf_token field
+    expanded_fields = quote! {
+        #expanded_fields
+        pub csrf_token: String,
+    };
+
+    // Generate the implementation
+    let expanded = quote! {
+        #[derive(Debug)]
+        pub struct #struct_name {
+            #expanded_fields
+        }
+
+        // impl #struct_name {
+        //     pub fn new_with_csrf(csrf_token: String) -> Self {
+        //         Self {
+        //             csrf_token,
+        //             ..Default::default()
+        //         }
+        //     }
+        // }
+    };
+
+    // Return the generated code
+    TokenStream::from(expanded)
+}
 
 #[proc_macro_derive(ToForm, attributes(html))]
 pub fn to_regular_form(input: TokenStream) -> TokenStream {

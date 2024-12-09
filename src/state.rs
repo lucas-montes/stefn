@@ -9,6 +9,7 @@ use crate::{
     config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
     sessions::Sessions,
+    website::Locale,
     AppError,
 };
 
@@ -47,6 +48,7 @@ pub struct WebsiteState {
     secrets: WebsiteConfig,
     shared: SharedState,
     sessions: Sessions,
+    locale: Locale,
 }
 
 impl WebsiteState {
@@ -55,6 +57,7 @@ impl WebsiteState {
             sessions: Sessions::new(&secrets.sessions_db),
             shared,
             secrets,
+            locale: Locale::new(),
         }
     }
 

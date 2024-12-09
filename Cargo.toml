@@ -37,11 +37,13 @@ argon2 = "0.5.3"
 hmac = "0.12.1"
 sha2 = "0.10.8"
 hex = "0.4.3"
-
+oauth2 = "4.4.1"
+reqwest = { version = "0.12", features = ["json"] }
 maxminddb = "0.24.0"
 menva = { version = "1.1.0", path = "../../menva" }
 futures = "0.3.31"
 uuid = { version = "1.11.0", features = ["v7", "fast-rng", "serde"] }
+lettre = "0.11.11"
 
 [dependencies.cookie]
 version = "0.18"

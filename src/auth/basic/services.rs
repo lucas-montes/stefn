@@ -9,12 +9,13 @@ use serde::Deserialize;
 
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
+    models::{EmailAccount, Group, User},
     service::AppError,
     sessions::Session,
     state::WebsiteState,
 };
 
-use super::find_user_by_email;
+use super::{email_validation::EmailValidation, find_user_by_email};
 
 #[derive(Deserialize)]
 pub enum IngressProcess {
@@ -77,22 +78,61 @@ pub async fn register<'a>(
     params: &'a IngressParams,
     input: &'a IngressForm,
 ) -> Result<&'a str, AppError> {
-    let redirect = params
-        .next
-        .as_ref()
-        .unwrap_or(&state.config().login_redirect_to);
+    let database = state.database();
+    let config = state.config();
 
-    let user = find_user_by_email(&state.database(), &input.email)
+    let mut tx = database.start_transaction().await?;
+
+    let password = hash_password(&input.password)?;
+
+    let user = User::create(&mut tx, &password)
         .await?
-        .ok_or(AppError::DoesNotExist)?;
-    verify_password(&input.password, &user.password)?;
-
-    state
-        .sessions()
-        .reuse_current_as_new_one(session, user.pk, user.groups)
+        .add_to_group(Group::User, &mut tx)
         .await?;
 
+    user.add_profile(&mut tx, "", "", "", "").await?;
+    let email_account = EmailAccount::create_primary(&mut tx, user, &input.email).await?;
+
+    tx.commit()
+        .await
+        .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+
+    let redirect = if config.email_validation {
+        //TODO: add the next param
+        EmailValidation::new(email_account.pk)
+            .save(database)
+            .await?
+            .send()
+            .await?;
+        &config.email_validation_redirect
+    } else {
+        state
+            .sessions()
+            .reuse_current_as_new_one(session, email_account.user.pk, email_account.user.groups)
+            .await?;
+        &config.login_redirect_to
+    };
+
     Ok(redirect)
+}
+
+pub async fn handle_validate_email<'a>(
+    state: &'a WebsiteState,
+    session: Session,
+    slug: String,
+) -> Result<&'a str, AppError> {
+    let database = state.database();
+    let mut tx = database.start_transaction().await?;
+    let validation = EmailValidation::delete_and_get_email_pk(&mut tx, slug).await?;
+    let email = EmailAccount::get_by_pk(&mut tx, validation.email_pk)
+        .await?
+        .set_to_active(&mut tx)
+        .await?;
+    email.user.set_to_active(&mut tx).await?;
+    tx.commit()
+        .await
+        .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+    Ok("")
 }
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {

@@ -16,7 +16,7 @@ pub struct LoginParam {
     next: Option<String>,
 }
 
-async fn start_oauth(
+pub async fn start_oauth(
     state: State<WebsiteState>,
     Extension(session): Extension<Session>,
     Query(params): Query<LoginParam>,
@@ -30,7 +30,7 @@ async fn start_oauth(
         return Ok(Redirect::to(return_url));
     };
 
-    let authorize_url = CallbackValidation::new(hostname, config)?
+    let authorize_url = CallbackValidation::new(hostname, config, config.google_scopes())?
         .save(database, return_url)
         .await?
         .authorize_url();
@@ -44,7 +44,7 @@ pub struct GoogleOauthParams {
     pub code: String,
 }
 
-async fn oauth_return<T: GoogleOauthCallbackHook>(
+pub async fn oauth_return<T: GoogleOauthCallbackHook + Send>(
     state: State<WebsiteState>,
     Extension(session): Extension<Session>,
     Query(params): Query<GoogleOauthParams>,

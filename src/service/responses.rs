@@ -71,6 +71,14 @@ pub enum AppError {
     Custom(StatusCode, String),
 }
 
+#[macro_export]
+macro_rules! log_and_wrap_custom_internal {
+    ($e:expr) => {{
+        tracing::error!("{:?}", $e);
+        AppError::custom_internal(&$e.to_string())
+    }};
+}
+
 #[derive(Serialize, ToResponse, ToSchema)]
 pub struct ErrorMessage {
     #[schema(example = "Sorry no sorry, something wrong happened")]

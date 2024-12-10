@@ -64,7 +64,7 @@ impl CallbackValidation {
         let csrf_state = CsrfToken::new(params_state);
 
         let query: (String, String) = sqlx::query_as(
-            r#"SELECT pkce_code_verifier,return_url FROM google_oauth_state WHERE csrf_state = $1;"#,
+            r#"SELECT pkce_code_verifier, return_url FROM google_oauth_state WHERE csrf_state = $1;"#,
         )
         .bind(csrf_state.secret())
         .fetch_one(&mut *tx)
@@ -81,7 +81,11 @@ impl CallbackValidation {
         Ok(query)
     }
 
-    pub fn new(hostname: String, config: &WebsiteConfig) -> Result<Self, AppError> {
+    pub fn new(
+        hostname: String,
+        config: &WebsiteConfig,
+        scopes: Vec<Scope>,
+    ) -> Result<Self, AppError> {
         let client = get_client(
             hostname,
             config.google_client_id.clone(),
@@ -93,7 +97,7 @@ impl CallbackValidation {
         let (authorize_url, csrf_state) = client
             .authorize_url(CsrfToken::new_random)
             .add_extra_param("access_type", "offline")
-            .add_scopes(config.google_scopes())
+            .add_scopes(scopes)
             .set_pkce_challenge(pkce_code_challenge)
             .url();
         Ok(Self {

@@ -65,6 +65,8 @@ pub struct WebsiteConfig {
     google_scopes: String,
     captcha_public_key: String,
     captcha_secrect_key: String,
+    pub email_validation: bool,
+    pub email_validation_redirect: String,
 }
 
 impl WebsiteConfig {
@@ -101,6 +103,8 @@ impl ServiceConfig for WebsiteConfig {
             google_scopes: "scope1,scope2".into(),
             captcha_public_key: "captcha_public_key".into(),
             captcha_secrect_key: "captcha_secrect_key".into(),
+            email_validation: false,
+            email_validation_redirect: "email_validation_redirect".into(),
         }
     }
 

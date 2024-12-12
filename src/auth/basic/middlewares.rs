@@ -8,7 +8,7 @@ use axum_extra::{headers::Cookie, TypedHeader};
 use std::net::SocketAddr;
 
 use super::services::set_session_cookies;
-use crate::{database::Database, service::AppError, sessions::Session, state::WebsiteState};
+use crate::{models::UserSession, service::AppError, sessions::Session, state::WebsiteState};
 
 pub async fn login_required_middleware(
     session: Extension<Session>,
@@ -51,9 +51,9 @@ pub async fn sessions_middleware(
 
             sessions
                 .create_session(
-                    None,
-                    String::new(),
+                    UserSession::default(),
                     config.session_expiration as u64,
+                    &config.session_key,
                     country,
                 )
                 .await?
@@ -63,10 +63,6 @@ pub async fn sessions_middleware(
     request.extensions_mut().insert(session.clone());
     //Before the response
     let mut resp = next.run(request).await;
-    //After the response
-    let session = sessions
-        .update_session(session, &config.session_key)
-        .await?;
 
     set_session_cookies(resp.headers_mut(), &session, config).await?;
 

@@ -15,15 +15,15 @@ use crate::{
     state::WebsiteState,
 };
 
-use super::{email_validation::EmailValidation, find_user_by_email};
+use super::email_validation::EmailValidation;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub enum IngressProcess {
     Login,
     Register,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct IngressForm {
     email: String,
     password: String,
@@ -42,6 +42,10 @@ pub async fn handle_ingress<'a>(
     params: &'a IngressParams,
     input: &'a IngressForm,
 ) -> Result<&'a str, AppError> {
+    let config = state.config();
+    session
+        .validate_csrf_token(&config.session_key, &input.csrf_token)
+        .await?;
     match input.process {
         IngressProcess::Login => login(&state, session, &params, &input).await,
         IngressProcess::Register => register(&state, session, &params, &input).await,
@@ -54,20 +58,19 @@ pub async fn login<'a>(
     params: &'a IngressParams,
     input: &'a IngressForm,
 ) -> Result<&'a str, AppError> {
-    let redirect = params
-        .next
-        .as_ref()
-        .unwrap_or(&state.config().login_redirect_to);
+    let config = state.config();
+    let redirect = params.next.as_ref().unwrap_or(&config.login_redirect_to);
 
-    let user = find_user_by_email(&state.database(), &input.email)
+    let user = User::find_by_email_with_password(&state.database(), &input.email)
         .await?
         .ok_or(AppError::DoesNotExist)?;
-    verify_password(&input.password, &user.password)?;
+    //TODO: fix
+    verify_password(&input.password, "password")?;
 
     let sessions = state.sessions();
 
     sessions
-        .reuse_current_as_new_one(session, user.pk, user.groups)
+        .reuse_current_as_new_one(session, user.for_session(), &config.session_key)
         .await?;
 
     Ok(redirect)
@@ -108,7 +111,11 @@ pub async fn register<'a>(
     } else {
         state
             .sessions()
-            .reuse_current_as_new_one(session, email_account.user.pk, email_account.user.groups)
+            .reuse_current_as_new_one(
+                session,
+                email_account.user.for_session(),
+                &config.session_key,
+            )
             .await?;
         &config.login_redirect_to
     };
@@ -122,6 +129,7 @@ pub async fn handle_validate_email<'a>(
     slug: String,
 ) -> Result<&'a str, AppError> {
     let database = state.database();
+    let config = state.config();
     let mut tx = database.start_transaction().await?;
     let validation = EmailValidation::delete_and_get_email_pk(&mut tx, slug).await?;
     let email = EmailAccount::get_by_pk(&mut tx, validation.email_pk)
@@ -132,7 +140,12 @@ pub async fn handle_validate_email<'a>(
     tx.commit()
         .await
         .map_err(|e| AppError::custom_internal(&e.to_string()))?;
-    Ok("")
+
+    state
+        .sessions()
+        .reuse_current_as_new_one(session, email.user.for_session(), &config.session_key)
+        .await?;
+    Ok(&config.login_redirect_to)
 }
 
 pub fn hash_password(password: &str) -> Result<String, AppError> {

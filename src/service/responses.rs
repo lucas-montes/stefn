@@ -63,6 +63,7 @@ pub enum AppError {
     DoesNotExist,
     //
     RoleError,
+    Unauthorized,
     //
     IpError(MaxMindDBError),
     IpDataNotFound,
@@ -113,6 +114,7 @@ impl IntoResponse for AppError {
             AppError::JWTModified(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
 
             AppError::RoleError => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
 
             AppError::DoesNotExist => (StatusCode::NOT_FOUND, "Not found".into()),
 

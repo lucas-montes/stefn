@@ -1,4 +1,7 @@
-use crate::service::AppError;
+use crate::{
+    models::{User, UserSession},
+    service::AppError,
+};
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -15,11 +18,11 @@ use uuid::Uuid;
 type HmacSha256 = Hmac<Sha256>;
 
 #[derive(Clone)]
-pub struct Session(Arc<RwLock<UserSession>>);
+pub struct Session(Arc<RwLock<SessionData>>);
 
 impl Session {
     pub async fn is_authenticated(&self) -> bool {
-        self.0.read().await.user_pk.is_some()
+        self.0.read().await.user.is_some()
     }
 
     pub async fn set_data<T: Serialize>(&self, data: &T) -> Result<(), AppError> {
@@ -36,7 +39,7 @@ impl Session {
     }
 
     pub async fn user_pk(&self) -> Option<i64> {
-        self.0.read().await.user_pk
+        self.0.read().await.user.pk()
     }
 
     pub async fn id(&self) -> String {
@@ -47,8 +50,12 @@ impl Session {
         self.0.read().await.csrf_token.to_owned()
     }
 
-    pub async fn token_is_valid(&self, secret: &str, token: &str) -> bool {
-        generate_token(secret, &self.0.read().await.get_token_data()).eq(token)
+    pub async fn validate_csrf_token(&self, secret: &str, token: &str) -> Result<(), AppError> {
+        if generate_token(secret, &self.0.read().await.get_token_data()).eq(token) {
+            Ok(())
+        } else {
+            Err(AppError::Unauthorized)
+        }
     }
 }
 
@@ -79,47 +86,29 @@ impl Sessions {
     }
 
     pub async fn find_session(&self, session_id: &str) -> Result<Option<Session>, AppError> {
-        UserSession::from_session_id(session_id, self.get_connection())
+        SessionData::from_session_id(session_id, self.get_connection())
             .await
             .map(|u| u.map(|u| Session(Arc::new(RwLock::new(u)))))
     }
 
     pub async fn create_session(
         &self,
-        user_pk: Option<i64>,
-        groups: String,
+        user: UserSession,
         session_expiration: u64,
-
+        secret: &str,
         country: &str,
     ) -> Result<Session, AppError> {
-        let session = UserSession::new(user_pk, groups, country, session_expiration);
+        let session = SessionData::new(user, country, session_expiration, secret);
 
         session.save(self.get_connection()).await?;
         Ok(Session(Arc::new(RwLock::new(session))))
     }
 
-    pub async fn update_session(
-        &self,
-        session: Session,
-        secret: &str,
-    ) -> Result<Session, AppError> {
-        session
-            .0
-            .write()
-            .await
-            .update_last_accessed()
-            .update_csrf_token(secret)
-            .update(self.get_connection())
-            .await?;
-
-        Ok(session)
-    }
-
     pub async fn reuse_current_as_new_one(
         &self,
         session: Session,
-        user_pk: i64,
-        groups: String,
+        user: UserSession,
+        secret: &str,
     ) -> Result<(), AppError> {
         //TODO: change this interface, take a struct as user
         session
@@ -127,7 +116,9 @@ impl Sessions {
             .write()
             .await
             .new_session_id()
-            .update_user(user_pk, groups)
+            .update_csrf_token(secret)
+            .update_user(user)
+            .update_dates()
             .save(self.get_connection())
             .await?;
         Ok(())
@@ -135,44 +126,42 @@ impl Sessions {
 }
 
 #[derive(Debug, Deserialize, sqlx::FromRow, Clone)]
-pub struct UserSession {
+pub struct SessionData {
     session_id: String,
-    user_pk: Option<i64>,
-    groups: String,
+    #[sqlx(flatten, default)]
+    user: UserSession,
     last_accessed: NaiveDateTime,
+    created_at: NaiveDateTime,
     expiration: NaiveDateTime,
     csrf_token: String,
     data: Option<Vec<u8>>,
     country: String,
 }
-// TODO: replace data, user_pk and groups by a struct that would hold user info plus additional info
 
-impl UserSession {
-    fn new(user_pk: Option<i64>, groups: String, country: &str, session_expiration: u64) -> Self {
+impl SessionData {
+    fn new(user: UserSession, country: &str, session_expiration: u64, secret: &str) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
         let today = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
         let expiration = today + Days::new(session_expiration);
-        Self {
+        let mut session = Self {
             session_id: Uuid::now_v7().to_string(),
-            user_pk,
-            groups,
+            user,
             last_accessed: today,
+            created_at: today,
             expiration,
             csrf_token: String::new(),
             data: None,
             country: country.into(),
-        }
+        };
+        session.update_csrf_token(secret);
+        session
     }
 
     fn get_token_data(&self) -> String {
-        format!("{}-{}", self.session_id, self.last_accessed)
-    }
-
-    fn token_is_valid(&self, secret: &str, token: &str) -> bool {
-        generate_token(secret, &self.get_token_data()).eq(token)
+        format!("{}-{}", self.session_id, self.created_at)
     }
 
     fn new_session_id(&mut self) -> &mut Self {
@@ -180,9 +169,8 @@ impl UserSession {
         self
     }
 
-    fn update_user(&mut self, user_pk: i64, groups: String) -> &mut Self {
-        self.user_pk = Some(user_pk);
-        self.groups = groups;
+    fn update_user(&mut self, user: UserSession) -> &mut Self {
+        self.user = user;
         self
     }
 
@@ -191,12 +179,14 @@ impl UserSession {
         self
     }
 
-    fn update_last_accessed(&mut self) -> &mut Self {
+    fn update_dates(&mut self) -> &mut Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
-        self.last_accessed = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
+        let today = DateTime::from_timestamp(now, 0).unwrap().naive_utc();
+        self.last_accessed = today;
+        self.created_at = today;
         self
     }
 
@@ -212,12 +202,13 @@ impl UserSession {
     }
 
     async fn save(&self, conn: &SqlitePool) -> Result<i64, AppError> {
-        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, expiration, csrf_token, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);")
+        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, created_at, expiration, csrf_token, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);")
             .bind(&self.session_id)
-            .bind(self.user_pk)
-            .bind(&self.groups)
-            .bind(self.last_accessed)
-            .bind(self.expiration)
+            .bind(self.user.pk())
+            .bind(self.user.groups().map(|u|u.to_string()))
+            .bind(&self.last_accessed)
+            .bind(&self.created_at)
+            .bind(&self.expiration)
             .bind(&self.csrf_token)
             .bind(&self.data)
             .bind(&self.country)
@@ -225,19 +216,6 @@ impl UserSession {
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))
             .map(|r|r.last_insert_rowid())
-    }
-
-    async fn update(&self, conn: &SqlitePool) -> Result<i64, AppError> {
-        sqlx::query(
-            "UPDATE web_sessions SET last_accessed = $1, csrf_token = $2 WHERE session_id = $3;",
-        )
-        .bind(self.last_accessed)
-        .bind(&self.csrf_token)
-        .bind(&self.session_id)
-        .execute(conn)
-        .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))
-        .map(|r| r.last_insert_rowid())
     }
 }
 

@@ -1,9 +1,7 @@
-use askama::Template;
 use axum::{
     extract::{Path, Query, State},
     response::Redirect,
-    routing::get,
-    Extension, Form, Router,
+    Extension, Form,
 };
 
 use crate::{service::AppError, sessions::Session, state::WebsiteState};

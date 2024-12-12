@@ -1,35 +1,150 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    error::Error,
+    str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, SqliteConnection};
+use sqlx::{prelude::FromRow, sqlite::SqliteRow, Decode, Row, SqliteConnection, Type};
 
 use crate::{database::Database, service::AppError};
 
-#[derive(Clone)]
+#[derive(Type, Debug, Copy, Clone, Deserialize, Serialize, PartialEq)]
+#[repr(i64)]
 pub enum Group {
     Admin = 1,
     User = 2,
 }
 
+impl FromStr for Group {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        match input {
+            "Admin" | "1" => Ok(Self::Admin),
+            "User" | "2" => Ok(Self::User),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Group {
-    fn to_str(&self) -> &str {
+    fn name(&self) -> &str {
         match self {
             Self::Admin => "Admin",
             Self::User => "User",
         }
     }
 }
-#[derive(FromRow, Deserialize, Serialize)]
+
+#[derive(Debug, Deserialize, Serialize, Default, Clone)]
+pub struct Groups(Vec<Group>);
+
+impl FromRow<'_, SqliteRow> for Groups {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        let groups: String = row.try_get("groups")?;
+        Ok(groups.parse().unwrap())
+    }
+}
+
+impl<DB: sqlx::Database> Type<DB> for Groups {
+    fn type_info() -> <DB as sqlx::Database>::TypeInfo {
+        todo!()
+    }
+}
+
+impl<'r, DB: sqlx::Database> Decode<'r, DB> for Groups
+where
+    // we want to delegate some of the work to string decoding so let's make sure strings
+    // are supported by the database
+    &'r str: Decode<'r, DB>,
+{
+    fn decode(
+        value: <DB as sqlx::Database>::ValueRef<'r>,
+    ) -> Result<Self, Box<dyn Error + 'static + Send + Sync>> {
+        // the interface of ValueRef is largely unstable at the moment
+        // so this is not directly implementable
+
+        // however, you can delegate to a type that matches the format of the type you want
+        // to decode (such as a UTF-8 string)
+
+        let value = <&str as Decode<DB>>::decode(value)?;
+
+        // now you can parse this into your type (assuming there is a `FromStr`)
+
+        Ok(value.parse()?)
+    }
+}
+
+impl FromStr for Groups {
+    type Err = Box<dyn Error + 'static + Send + Sync>;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Ok(Self(
+            input
+                .split(",")
+                .filter_map(|g| g.parse::<Group>().ok())
+                .collect(),
+        ))
+    }
+}
+
+impl Groups {
+    pub fn to_string(&self) -> String {
+        self.0
+            .iter()
+            .filter_map(|&g| std::char::from_digit(g as u32, 10))
+            .collect()
+    }
+
+    fn push(&mut self, group: Group) {
+        self.0.push(group);
+    }
+
+    fn contains(&self, group: &Group) -> bool {
+        self.0.contains(group)
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Default)]
+pub struct UserSession(Option<User>);
+
+impl FromRow<'_, SqliteRow> for UserSession {
+    fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        if row.is_empty() {
+            Ok(Self(None))
+        } else {
+            Ok(Self(Some(User::from_row(row)?)))
+        }
+    }
+}
+
+impl UserSession {
+    pub fn groups(&self) -> Option<&Groups> {
+        self.0.as_ref().map(|u| &u.groups)
+    }
+
+    pub fn pk(&self) -> Option<i64> {
+        self.0.as_ref().map(|u| u.pk)
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.0.is_some()
+    }
+}
+
+#[derive(FromRow, Type, Debug, Deserialize, Serialize, Clone)]
 pub struct User {
-    #[sqlx(rename = "user_pk")]
     pub pk: i64,
-    pub groups: String,
-    // TODO: create custom type for groups
+    pub groups: Groups,
 }
 // TODO: by default start with a user like this one to manage state and auth. Create a nice trait
 // and make it public so you can hook your own auth/state struct
 
 impl User {
+    pub fn for_session(self) -> UserSession {
+        UserSession(Some(self))
+    }
     pub async fn create(tx: &mut SqliteConnection, password: &str) -> Result<Self, AppError> {
         let pk = sqlx::query("INSERT INTO users (password) VALUES ($1);")
             .bind(password)
@@ -39,7 +154,7 @@ impl User {
             .map(|q| q.last_insert_rowid())?;
         Ok(Self {
             pk,
-            groups: String::default(),
+            groups: Groups::default(),
         })
     }
 
@@ -53,7 +168,7 @@ impl User {
             .map(|q| q.last_insert_rowid())?;
         Ok(Self {
             pk,
-            groups: String::default(),
+            groups: Groups::default(),
         })
     }
 
@@ -62,7 +177,7 @@ impl User {
         group: Group,
         tx: &mut SqliteConnection,
     ) -> Result<Self, AppError> {
-        if self.groups.contains(group.to_str()) {
+        if self.groups.contains(&group) {
             return Ok(self);
         }
 
@@ -73,8 +188,7 @@ impl User {
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))?;
 
-        self.groups.push_str(group.to_str());
-        self.groups.push(',');
+        self.groups.push(group);
         Ok(self)
     }
 
@@ -98,19 +212,35 @@ impl User {
             .map(|q| q.last_insert_rowid())
     }
 
-    pub async fn set_to_active(self, tx: &mut SqliteConnection) -> Result<Self, AppError> {
+    pub async fn set_to_active(&self, tx: &mut SqliteConnection) -> Result<i64, AppError> {
         sqlx::query("UPDATE users SET is_active = $1 WHERE pk = 2$;")
             .bind(1)
             .bind(self.pk)
             .execute(tx)
             .await
             .map_err(|e| AppError::custom_internal(&e.to_string()))
-            .map(|q| q.last_insert_rowid())?;
-        Ok(self)
+            .map(|q| q.last_insert_rowid())
+    }
+
+    pub async fn find_by_email_with_password(
+        database: &Database,
+        email: &str,
+    ) -> Result<Option<Self>, AppError> {
+        sqlx::query_as(
+            "SELECT users.pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups, users.password
+                FROM emails
+                INNER JOIN users ON users.pk = emails.user_pk
+                LEFT JOIN users_groups_m2m ON users.pk = users_groups_m2m.user_pk
+                WHERE emails.email = $1;",
+        )
+        .bind(email)
+        .fetch_optional(database.get_connection())
+        .await
+        .map_err(|e| AppError::custom_internal(&e.to_string()))
     }
 }
 
-#[derive(FromRow)]
+#[derive(Debug, FromRow)]
 pub struct EmailAccount {
     pub pk: i64,
     #[sqlx(flatten)]
@@ -134,11 +264,10 @@ impl EmailAccount {
 
     pub async fn get_by_pk(tx: &mut SqliteConnection, pk: i64) -> Result<Self, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups 
-                FROM emails
-                INNER JOIN users ON users.pk = emails.pk
-                LEFT JOIN users_groups_m2m ON users.pk = users_groups_m2m.user_pk
-                WHERE emails.pk = $1;",
+            "SELECT emails.pk, emails.user_pk, GROUP_CONCAT(group_pk, ',') as groups 
+            FROM emails
+            LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
+            WHERE emails.pk = $1;",
         )
         .bind(pk)
         .fetch_one(tx)
@@ -248,7 +377,8 @@ mod tests {
         assert!(user.is_ok());
         let user = user.unwrap();
         assert!(user.pk > 0);
-        assert_eq!(user.groups, "Admin,");
+        assert!(user.groups.contains(&Group::Admin));
+        assert!(!user.groups.contains(&Group::User));
     }
 
     #[tokio::test]
@@ -271,7 +401,8 @@ mod tests {
         tx.commit().await.unwrap();
 
         assert!(user.pk > 0);
-        assert_eq!(user.groups, "Admin,User,");
+        assert!(user.groups.contains(&Group::Admin));
+        assert!(user.groups.contains(&Group::User));
     }
 
     #[tokio::test]

@@ -12,6 +12,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use sqlx::sqlite::SqliteRow;
 
 use crate::{
+    config::WebsiteConfig,
     database::{Database, Manager, Where},
     service::AppError,
     state::WebsiteState,
@@ -79,15 +80,8 @@ where
             .with_state(state)
     }
 
-    async fn list<'a>() -> AdminListTemplate<'a> {
-        let meta = Meta::new(
-            "list all objects".into(),
-            "elerem mola".into(),
-            "recsys,mola".into(),
-            "lucas montes".into(),
-            "elerem.com".into(),
-            "imafge.com".into(),
-        );
+    async fn list<'a>(config: State<WebsiteConfig>) -> AdminListTemplate<'a> {
+        let meta = Meta::default();
         AdminListTemplate { meta }
     }
 
@@ -100,14 +94,7 @@ where
     }
 
     async fn get_create_form<'a>() -> AdminFormTemplate<'a> {
-        let meta = Meta::new(
-            "create new object".into(),
-            "elerem mola".into(),
-            "recsys,mola".into(),
-            "lucas montes".into(),
-            "elerem.com".into(),
-            "imafge.com".into(),
-        );
+        let meta = Meta::default();
         let form = Self::Create::to_empty_form();
         AdminFormTemplate { meta, form }
     }
@@ -116,14 +103,7 @@ where
         State(database): State<Database>,
         Path(model_pk): Path<i64>,
     ) -> Result<AdminFormTemplate<'a>, AppError> {
-        let meta = Meta::new(
-            "update a object".into(),
-            "elerem mola".into(),
-            "recsys,mola".into(),
-            "lucas montes".into(),
-            "elerem.com".into(),
-            "imafge.com".into(),
-        );
+        let meta = Meta::default();
         let model = Self::get_by::<Self::Update>(&database, Where::Pk(model_pk))
             .await?
             .ok_or_else(|| AppError::DoesNotExist)?;

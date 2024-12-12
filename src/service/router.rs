@@ -26,7 +26,9 @@ pub fn get_router<S>(state: S, routes: Router<S>) -> Router
 where
     S: Send + Sync + Clone + 'static,
 {
-    let sensitive_headers: Arc<[_]> = vec![AUTHORIZATION, COOKIE].into();
+    //TODO: depending on test or prod enables some
+    // let sensitive_headers: Arc<[_]> = vec![AUTHORIZATION, COOKIE].into();
+    let sensitive_headers: Arc<[_]> = vec![].into();
     // Build our middleware stack
     let middleware = ServiceBuilder::new()
         .layer(NormalizePathLayer::trim_trailing_slash())

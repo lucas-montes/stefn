@@ -4,10 +4,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, sqlite::SqliteRow, Decode, Row, SqliteConnection, Type};
 
-use crate::{database::Database, service::AppError};
+use crate::{database::Database, log_and_wrap_custom_internal, service::AppError};
 
 #[derive(Type, Debug, Copy, Clone, Deserialize, Serialize, PartialEq)]
 #[repr(i64)]
@@ -47,9 +48,12 @@ impl FromRow<'_, SqliteRow> for Groups {
     }
 }
 
-impl<DB: sqlx::Database> Type<DB> for Groups {
+impl<DB: sqlx::Database> Type<DB> for Groups
+where
+    String: Type<DB>,
+{
     fn type_info() -> <DB as sqlx::Database>::TypeInfo {
-        todo!()
+        <String as Type<DB>>::type_info()
     }
 }
 
@@ -133,24 +137,37 @@ impl UserSession {
     }
 }
 
-#[derive(FromRow, Type, Debug, Deserialize, Serialize, Clone)]
+#[derive(FromRow, Debug, Deserialize, Serialize, Clone)]
 pub struct User {
+    #[sqlx(rename = "user_pk")]
     pub pk: i64,
     pub groups: Groups,
 }
 // TODO: by default start with a user like this one to manage state and auth. Create a nice trait
 // and make it public so you can hook your own auth/state struct
 
+#[derive(Debug, FromRow)]
+pub struct UserWithPassword {
+    #[sqlx(flatten)]
+    pub user: User,
+    pub password: String,
+}
+
 impl User {
     pub fn for_session(self) -> UserSession {
         UserSession(Some(self))
     }
-    pub async fn create(tx: &mut SqliteConnection, password: &str) -> Result<Self, AppError> {
-        let pk = sqlx::query("INSERT INTO users (password) VALUES ($1);")
+    pub async fn create(
+        tx: &mut SqliteConnection,
+        password: &str,
+        activated_at: Option<i64>,
+    ) -> Result<Self, AppError> {
+        let pk = sqlx::query("INSERT INTO users (password, activated_at) VALUES ($1, $2);")
             .bind(password)
+            .bind(activated_at)
             .execute(tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())?;
         Ok(Self {
             pk,
@@ -159,17 +176,18 @@ impl User {
     }
 
     pub async fn create_active_default(tx: &mut SqliteConnection) -> Result<Self, AppError> {
-        let pk = sqlx::query("INSERT INTO users (password, is_active) VALUES ($1, $2);")
-            .bind("SDFdso34$hl#sdfj")
-            .bind(1)
-            .execute(tx)
-            .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
-            .map(|q| q.last_insert_rowid())?;
-        Ok(Self {
-            pk,
-            groups: Groups::default(),
-        })
+        Self::create_active(tx, "SDFdso34$hl#sdfj").await
+    }
+
+    pub async fn create_active(
+        tx: &mut SqliteConnection,
+        password: &str,
+    ) -> Result<Self, AppError> {
+        let activated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+        Self::create(tx, password, Some(activated_at)).await
     }
 
     pub async fn add_to_group(
@@ -186,57 +204,41 @@ impl User {
             .bind(group.clone() as i64)
             .execute(tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         self.groups.push(group);
         Ok(self)
     }
 
-    pub async fn add_profile(
-        &self,
-        tx: &mut SqliteConnection,
-        name: &str,
-        given_name: &str,
-        family_name: &str,
-        picture: &str,
-    ) -> Result<i64, AppError> {
-        sqlx::query("INSERT INTO profiles (name, given_name, family_name, picture, user_pk) VALUES ($1, $2, $3, $4, $5);")
-            .bind(name)
-            .bind(given_name)
-            .bind(family_name)
-            .bind(picture)
-            .bind(self.pk)
-            .execute(tx)
-            .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
-            .map(|q| q.last_insert_rowid())
-    }
-
     pub async fn set_to_active(&self, tx: &mut SqliteConnection) -> Result<i64, AppError> {
-        sqlx::query("UPDATE users SET is_active = $1 WHERE pk = 2$;")
-            .bind(1)
+        let activated_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_secs() as i64;
+        sqlx::query("UPDATE users SET activated_at = $1 WHERE pk = $2;")
+            .bind(activated_at)
             .bind(self.pk)
             .execute(tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())
     }
 
     pub async fn find_by_email_with_password(
         database: &Database,
         email: &str,
-    ) -> Result<Option<Self>, AppError> {
+    ) -> Result<Option<UserWithPassword>, AppError> {
         sqlx::query_as(
-            "SELECT users.pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups, users.password
+            "SELECT emails.user_pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups, users.password
                 FROM emails
                 INNER JOIN users ON users.pk = emails.user_pk
-                LEFT JOIN users_groups_m2m ON users.pk = users_groups_m2m.user_pk
+                LEFT JOIN users_groups_m2m ON emails.user_pk = users_groups_m2m.user_pk
                 WHERE emails.email = $1;",
         )
         .bind(email)
         .fetch_optional(database.get_connection())
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))
+        .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 }
 
@@ -250,16 +252,15 @@ pub struct EmailAccount {
 impl EmailAccount {
     pub async fn get_by_email(database: &Database, email: &str) -> Result<Option<Self>, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, users.pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, GROUP_CONCAT(group_pk, ',') as groups 
                 FROM emails
-                INNER JOIN users ON users.pk = emails.user_pk
-                LEFT JOIN users_groups_m2m ON users.pk = users_groups_m2m.user_pk
+                LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
                 WHERE emails.email = $1;",
         )
         .bind(email)
         .fetch_optional(database.get_connection())
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))
+        .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub async fn get_by_pk(tx: &mut SqliteConnection, pk: i64) -> Result<Self, AppError> {
@@ -272,7 +273,7 @@ impl EmailAccount {
         .bind(pk)
         .fetch_one(tx)
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))
+        .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub async fn create_primary_active(
@@ -284,6 +285,16 @@ impl EmailAccount {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
+
+        Self::create_primary(tx, user, email, Some(activated_at)).await
+    }
+
+    pub async fn create_primary(
+        tx: &mut SqliteConnection,
+        user: User,
+        email: &str,
+        activated_at: Option<i64>,
+    ) -> Result<Self, AppError> {
         let pk = sqlx::query("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4);")
             .bind(1)
             .bind(user.pk)
@@ -291,24 +302,8 @@ impl EmailAccount {
             .bind(email)
             .execute(tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())?;
-        Ok(Self { pk, user })
-    }
-    pub async fn create_primary(
-        tx: &mut SqliteConnection,
-        user: User,
-        email: &str,
-    ) -> Result<Self, AppError> {
-        let pk =
-            sqlx::query("INSERT INTO emails (is_primary, user_pk, email) VALUES ($1, $2, $3);")
-                .bind(1)
-                .bind(user.pk)
-                .bind(email)
-                .execute(tx)
-                .await
-                .map_err(|e| AppError::custom_internal(&e.to_string()))
-                .map(|q| q.last_insert_rowid())?;
         Ok(Self { pk, user })
     }
 
@@ -317,12 +312,12 @@ impl EmailAccount {
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
-        sqlx::query("UPDATE emails SET activated_at = $1 WHERE pk = 2$;")
+        sqlx::query("UPDATE emails SET activated_at = $1 WHERE pk = $2;")
             .bind(activated_at)
             .bind(self.pk)
             .execute(tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())?;
         Ok(self)
     }
@@ -333,6 +328,88 @@ mod tests {
     use crate::database::TestDatabase;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_email_account_get_by_email() {
+        let database = TestDatabase::setup().await;
+
+        let mut tx = database.start_transaction().await.unwrap();
+        let user = User::create_active_default(&mut tx)
+            .await
+            .unwrap()
+            .add_to_group(Group::Admin, &mut tx)
+            .await
+            .unwrap()
+            .add_to_group(Group::User, &mut tx)
+            .await
+            .unwrap();
+        let email_account = EmailAccount::create_primary_active(
+            &mut tx,
+            user,
+            "test_email_account_get_by_email@example.com",
+        )
+        .await;
+        tx.commit().await.unwrap();
+        let account = email_account.unwrap();
+
+        let result = EmailAccount::get_by_email(
+            database.database(),
+            "test_email_account_get_by_email@example.com",
+        )
+        .await
+        .unwrap();
+
+        assert!(result.is_some());
+        let result = result.unwrap();
+
+        assert_eq!(result.user.groups.0, vec![Group::Admin, Group::User]);
+
+        sqlx::query("DELETE FROM users WHERE pk = $1;")
+            .bind(account.user.pk)
+            .execute(database.get_connection())
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_find_by_email_with_password() {
+        let database = TestDatabase::setup().await;
+
+        let mut tx = database.start_transaction().await.unwrap();
+        let user = User::create_active_default(&mut tx)
+            .await
+            .unwrap()
+            .add_to_group(Group::User, &mut tx)
+            .await
+            .unwrap();
+        let account = EmailAccount::create_primary_active(
+            &mut tx,
+            user,
+            "test_find_by_email_with_password@example.com",
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+
+        let result = User::find_by_email_with_password(
+            database.database(),
+            "test_find_by_email_with_password@example.com",
+        )
+        .await
+        .unwrap();
+        assert!(result.is_some());
+
+        let result = result.unwrap();
+
+        assert_eq!(result.password, "SDFdso34$hl#sdfj");
+        assert_eq!(result.user.groups.0, vec![Group::User]);
+
+        sqlx::query("DELETE FROM users WHERE pk = $1;")
+            .bind(account.user.pk)
+            .execute(database.get_connection())
+            .await
+            .unwrap();
+    }
 
     #[tokio::test]
     async fn test_create_active_default() {
@@ -348,23 +425,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_add_profile() {
-        let database = TestDatabase::setup().await;
-
-        let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx)
-            .await
-            .unwrap()
-            .add_profile(&mut tx, "name", "given_name", "family_name", "picture")
-            .await;
-        tx.commit().await.unwrap();
-
-        assert!(user.is_ok());
-        let profile_pk = user.unwrap();
-        assert!(profile_pk > 0);
-    }
-
-    #[tokio::test]
     async fn test_create_admin_user() {
         let database = TestDatabase::setup().await;
 
@@ -377,8 +437,7 @@ mod tests {
         assert!(user.is_ok());
         let user = user.unwrap();
         assert!(user.pk > 0);
-        assert!(user.groups.contains(&Group::Admin));
-        assert!(!user.groups.contains(&Group::User));
+        assert_eq!(user.groups.0, vec![Group::Admin]);
     }
 
     #[tokio::test]
@@ -401,8 +460,7 @@ mod tests {
         tx.commit().await.unwrap();
 
         assert!(user.pk > 0);
-        assert!(user.groups.contains(&Group::Admin));
-        assert!(user.groups.contains(&Group::User));
+        assert_eq!(user.groups.0, vec![Group::Admin, Group::User]);
     }
 
     #[tokio::test]

@@ -3,7 +3,6 @@ use axum::async_trait;
 use crate::{
     config::WebsiteConfig,
     database::Database,
-    models::{EmailAccount, Group, User},
     service::AppError,
     sessions::{Session, Sessions},
     state::WebsiteState,
@@ -40,13 +39,13 @@ pub trait GoogleOauthCallbackHook {
             None => Self::create_user(database, token_response, user_info).await?,
         };
 
-        Self::update_session(&state.config(), state.sessions(), session, &user).await
+        Self::update_session(&state.config(), state.sessions(), session, user).await
     }
 
     async fn update_session(
         config: &WebsiteConfig,
         sessions: &Sessions,
         session: Session,
-        user: &Self::User,
+        user: Self::User,
     ) -> Result<(), AppError>;
 }

@@ -3,7 +3,7 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use maxminddb::geoip2;
 use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Sqlite, SqlitePool, Transaction};
 
-use crate::service::AppError;
+use crate::{log_and_wrap_custom_internal, service::AppError};
 
 #[derive(Clone)]
 pub struct Database {
@@ -48,7 +48,7 @@ impl Database {
         self.get_connection()
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 }
 
@@ -73,7 +73,7 @@ impl TestDatabase {
         self.get_connection()
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub async fn run_test_migrations(&self, path: &str) {
@@ -123,7 +123,7 @@ impl TestDatabase {
 
         tx.commit()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         Ok(())
     }

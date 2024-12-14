@@ -5,7 +5,7 @@ use sqlx::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::service::AppError;
+use crate::{log_and_wrap_custom_internal, service::AppError};
 
 #[derive(Clone)]
 pub struct Broker {
@@ -55,7 +55,7 @@ impl Broker {
             .storage
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(format!(
             "INSERT INTO {}(source, command, version, priority, created_at, payload) ",
@@ -75,13 +75,13 @@ impl Broker {
             .build()
             .execute(&mut *tx)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?
+            .map_err(|e| log_and_wrap_custom_internal!(e))?
             .rows_affected();
 
         let _ = tx
             .commit()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
         Ok(result)
     }
 }

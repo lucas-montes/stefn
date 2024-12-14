@@ -8,7 +8,9 @@ use oauth2::{
 
 use reqwest::Url;
 
-use crate::{config::WebsiteConfig, database::Database, service::AppError};
+use crate::{
+    config::WebsiteConfig, database::Database, log_and_wrap_custom_internal, service::AppError,
+};
 
 pub struct OauthTokenResponse(pub StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>);
 
@@ -42,8 +44,8 @@ impl OauthTokenResponse {
                 .request(http_client)
         })
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))?
-        .map_err(|e| AppError::custom_internal(&e.to_string()))
+        .map_err(|e| log_and_wrap_custom_internal!(e))?
+        .map_err(|e| log_and_wrap_custom_internal!(e))
         .map(Self)
     }
 }
@@ -69,7 +71,7 @@ impl CallbackValidation {
         .bind(csrf_state.secret())
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+        .map_err(|e| log_and_wrap_custom_internal!(e))?;
         let _ = sqlx::query("DELETE FROM google_oauth_state WHERE csrf_state = $1;")
             .bind(csrf_state.secret())
             .execute(&mut *tx)
@@ -77,7 +79,7 @@ impl CallbackValidation {
 
         tx.commit()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
         Ok(query)
     }
 
@@ -118,11 +120,11 @@ impl CallbackValidation {
         .bind(return_url)
         .execute(&mut *tx)
         .await
-        .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+        .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         tx.commit()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         Ok(self)
     }

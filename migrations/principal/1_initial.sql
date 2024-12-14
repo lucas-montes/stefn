@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
     pk INTEGER PRIMARY KEY,
     password TEXT NOT NULL,
-    is_active INTEGER NOT NULL DEFAULT 0,
+    activated_at INTEGER,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
 );
 

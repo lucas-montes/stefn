@@ -65,6 +65,7 @@ pub async fn sessions_middleware(
     let mut resp = next.run(request).await;
 
     set_session_cookies(resp.headers_mut(), &session, config).await?;
+    //TODO: something wrong with the session cookies when logedin from password
 
     Ok(resp)
 }

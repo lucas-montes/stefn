@@ -1,7 +1,7 @@
 use axum::async_trait;
 use sqlx::{sqlite::SqliteRow, QueryBuilder};
 
-use crate::service::AppError;
+use crate::{log_and_wrap_custom_internal, service::AppError};
 
 use super::Database;
 
@@ -28,7 +28,7 @@ pub trait Manager {
             .get_connection()
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         let mut query_builder = QueryBuilder::new("SELECT * FROM ");
         query_builder.push(Self::TABLE);
@@ -39,14 +39,14 @@ pub trait Manager {
                 .bind(pk)
                 .fetch_optional(&mut *tx)
                 .await
-                .map_err(|e| AppError::custom_internal(&e.to_string()))
+                .map_err(|e| log_and_wrap_custom_internal!(e))
         } else {
             query_builder.push(" WHERE pk = $1;");
             query_builder
                 .build_query_as()
                 .fetch_optional(&mut *tx)
                 .await
-                .map_err(|e| AppError::custom_internal(&e.to_string()))
+                .map_err(|e| log_and_wrap_custom_internal!(e))
         }
     }
 
@@ -55,14 +55,14 @@ pub trait Manager {
             .get_connection()
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
         if let Where::Pk(pk) = clause {
             sqlx::query("DELETE FROM $1 WHERE pk = $2;")
                 .bind(Self::TABLE)
                 .bind(pk)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+                .map_err(|e| log_and_wrap_custom_internal!(e))?;
         }
         Ok(())
     }
@@ -72,14 +72,14 @@ pub trait Manager {
             .get_connection()
             .begin()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
         if let Where::Pk(pk) = clause {
             sqlx::query("DELETE FROM $1 WHERE pk = $2;")
                 .bind(Self::TABLE)
                 .bind(pk)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| AppError::custom_internal(&e.to_string()))?;
+                .map_err(|e| log_and_wrap_custom_internal!(e))?;
         }
         Ok(())
     }
@@ -99,7 +99,7 @@ pub trait Manager {
         sqlx::query(&q)
             .execute(database.get_connection())
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .unwrap();
     }
 }

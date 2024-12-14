@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::service::AppError;
+use crate::{log_and_wrap_custom_internal, service::AppError};
 
 #[derive(Deserialize)]
 pub struct GoogleUserInfo {
@@ -31,10 +31,10 @@ impl GoogleUserInfo {
             "https://www.googleapis.com/oauth2/v2/userinfo?oauth_token=".to_owned() + access_token;
         reqwest::get(url)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))?
+            .map_err(|e| log_and_wrap_custom_internal!(e))?
             .json()
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub fn validate_email(self) -> Result<Self, AppError> {

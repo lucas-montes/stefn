@@ -1,4 +1,5 @@
 mod admin;
+mod forms;
 pub mod html;
 mod locale;
 mod seo;

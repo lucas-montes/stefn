@@ -3,8 +3,8 @@ mod google;
 mod jwt;
 
 pub use basic::{
-    hash_password, ingress, login_required_middleware, sessions_middleware, validate_email,
-    verify_password,
+    hash_password, login_required_middleware, sessions_middleware, verify_password,
+    EmailValidation, EmailValidationManager, Ingress,
 };
 pub use google::{
     oauth_return, start_oauth, CallbackValidation, GoogleOauthCallbackHook, GoogleUserInfo,

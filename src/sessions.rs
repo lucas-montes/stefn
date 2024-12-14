@@ -1,7 +1,4 @@
-use crate::{
-    models::{User, UserSession},
-    service::AppError,
-};
+use crate::{log_and_wrap_custom_internal, models::UserSession, service::AppError};
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -20,6 +17,8 @@ type HmacSha256 = Hmac<Sha256>;
 #[derive(Clone)]
 pub struct Session(Arc<RwLock<SessionData>>);
 
+//TODO: fix the session cookies clean up and refresh and validation
+
 impl Session {
     pub async fn is_authenticated(&self) -> bool {
         self.0.read().await.user.is_some()
@@ -29,13 +28,13 @@ impl Session {
         //TODO: improve this
         let mut storage = self.0.write().await;
         storage.data =
-            Some(serde_json::to_vec(data).map_err(|e| AppError::custom_internal(&e.to_string()))?);
+            Some(serde_json::to_vec(data).map_err(|e| log_and_wrap_custom_internal!(e))?);
         Ok(())
     }
 
     pub async fn get_data<T: DeserializeOwned>(&self) -> Result<T, AppError> {
         serde_json::from_slice(self.0.read().await.data.as_ref().unwrap())
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub async fn user_pk(&self) -> Option<i64> {
@@ -110,7 +109,6 @@ impl Sessions {
         user: UserSession,
         secret: &str,
     ) -> Result<(), AppError> {
-        //TODO: change this interface, take a struct as user
         session
             .0
             .write()
@@ -198,7 +196,7 @@ impl SessionData {
             .bind(session_id)
             .fetch_optional(conn)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     async fn save(&self, conn: &SqlitePool) -> Result<i64, AppError> {
@@ -214,7 +212,7 @@ impl SessionData {
             .bind(&self.country)
             .execute(conn)
             .await
-            .map_err(|e| AppError::custom_internal(&e.to_string()))
+            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|r|r.last_insert_rowid())
     }
 }

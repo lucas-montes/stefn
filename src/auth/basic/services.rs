@@ -20,6 +20,7 @@ use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
     log_and_wrap_custom_internal,
+    mailing::Mailer,
     models::{EmailAccount, Group, User, UserWithPassword},
     service::AppError,
     sessions::{Session, Sessions},
@@ -53,15 +54,15 @@ pub trait Ingress {
         state: State<WebsiteState>,
         Extension(session): Extension<Session>,
         params: Query<IngressParams>,
-        input: Form<IngressForm>,
+        Form(input): Form<IngressForm>,
     ) -> Result<Redirect, AppError> {
         let config = state.config();
         session
             .validate_csrf_token(&config.session_key, &input.csrf_token)
             .await?;
         match input.process {
-            IngressProcess::Login => Self::login(&state, session, &params, &input).await,
-            IngressProcess::Register => Self::register(&state, session, &params, &input).await,
+            IngressProcess::Login => Self::login(&state, session, &params, input).await,
+            IngressProcess::Register => Self::register(&state, session, &params, input).await,
         }
         .map(|r| Redirect::to(r))
     }
@@ -70,11 +71,11 @@ pub trait Ingress {
         state: &'a WebsiteState,
         session: Session,
         params: &'a IngressParams,
-        input: &'a IngressForm,
+        input: IngressForm,
     ) -> Result<&'a str, AppError> {
         let config = state.config();
 
-        let user = Self::validate_login(state, input).await?;
+        let user = Self::validate_login(state, &input).await?;
 
         Self::handle_login_session(state.sessions(), session, config, user).await?;
 
@@ -88,7 +89,7 @@ pub trait Ingress {
         User::find_by_email_with_password(&state.database(), &input.email)
             .await?
             .ok_or(AppError::DoesNotExist)
-            .and_then(|u| verify_password(&input.password, "password").map(|_| u))
+            .and_then(|u| verify_password(&input.password, &u.password).map(|_| u))
     }
 
     async fn handle_login_session<'a>(
@@ -98,7 +99,7 @@ pub trait Ingress {
         user: UserWithPassword,
     ) -> Result<(), AppError> {
         sessions
-            .reuse_current_as_new_one(session, user.user.for_session(), &config.session_key)
+            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
             .await
     }
 
@@ -110,7 +111,7 @@ pub trait Ingress {
         state: &'a WebsiteState,
         session: Session,
         params: &'a IngressParams,
-        input: &'a IngressForm,
+        input: IngressForm,
     ) -> Result<&'a str, AppError> {
         let config = state.config();
         let database = state.database();
@@ -118,11 +119,7 @@ pub trait Ingress {
         let user = Self::create_user(database, input, config).await?;
 
         if config.email_validation {
-            EmailValidationManager::new(user.pk)
-                .save(database)
-                .await?
-                .send()
-                .await?;
+            Self::handle_email_validation(state, &user).await?;
         } else {
             Self::handle_register_session(state.sessions(), session, config, user).await?;
         };
@@ -132,19 +129,23 @@ pub trait Ingress {
 
     async fn create_user<'a>(
         database: &'a Database,
-        input: &'a IngressForm,
+        input: IngressForm,
         config: &'a WebsiteConfig,
     ) -> Result<EmailAccount, AppError> {
         let mut tx = database.start_transaction().await?;
 
         let password = hash_password(&input.password)?;
 
-        let activated_at = config.email_validation.then_some(
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_secs() as i64,
-        );
+        let activated_at = if config.email_validation {
+            None
+        } else {
+            Some(
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .expect("Time went backwards")
+                    .as_secs() as i64,
+            )
+        };
 
         let user = User::create(&mut tx, &password, activated_at)
             .await?
@@ -152,12 +153,25 @@ pub trait Ingress {
             .await?;
 
         let email_account =
-            EmailAccount::create_primary(&mut tx, user, &input.email, activated_at).await?;
+            EmailAccount::create_primary(&mut tx, user, input.email, activated_at).await?;
 
-        tx.commit()
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        tx.commit().await?;
         Ok(email_account)
+    }
+
+    async fn handle_email_validation<'a>(
+        state: &'a WebsiteState,
+        user: &'a EmailAccount,
+    ) -> Result<(), AppError> {
+        let config = state.config();
+        let database = state.database();
+        let mailer = state.mailer();
+        EmailValidationManager::new(user.pk)
+            .save(database)
+            .await?
+            .send(config, mailer, &user.email)
+            .await?;
+        Ok(())
     }
 
     async fn handle_register_session<'a>(
@@ -167,7 +181,7 @@ pub trait Ingress {
         user: EmailAccount,
     ) -> Result<(), AppError> {
         sessions
-            .reuse_current_as_new_one(session, user.user.for_session(), &config.session_key)
+            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
             .await
     }
 
@@ -201,7 +215,7 @@ pub trait EmailValidation {
         let config = state.config();
         let mut tx = database.start_transaction().await?;
         let validation = EmailValidationManager::delete_and_get_email_pk(&mut tx, slug).await?;
-        let user = Self::active_user(&mut tx, validation).await?;
+        let user = Self::activate_user(&mut tx, validation).await?;
         tx.commit()
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
@@ -210,7 +224,7 @@ pub trait EmailValidation {
         Ok(&config.login_redirect_to)
     }
 
-    async fn active_user<'a>(
+    async fn activate_user<'a>(
         tx: &mut SqliteConnection,
         validation: EmailValidationManager,
     ) -> Result<EmailAccount, AppError> {
@@ -229,7 +243,7 @@ pub trait EmailValidation {
         user: EmailAccount,
     ) -> Result<(), AppError> {
         sessions
-            .reuse_current_as_new_one(session, user.user.for_session(), &config.session_key)
+            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
             .await
     }
 }
@@ -283,5 +297,11 @@ pub async fn set_session_cookies(
         HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
             .map_err(|e| log_and_wrap_custom_internal!(e))?,
     );
+    //TODO: see how and where to put those
+    // headers.insert(
+    //     "Content-Security-Policy",
+    //     "default-src 'self'".parse().unwrap(),
+    // );
+    headers.insert("X-Frame-Options", "DENY".parse().unwrap());
     Ok(())
 }

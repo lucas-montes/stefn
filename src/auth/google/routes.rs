@@ -20,17 +20,16 @@ pub async fn start_oauth(
     state: State<WebsiteState>,
     Extension(session): Extension<Session>,
     Query(params): Query<LoginParam>,
-    Host(hostname): Host,
 ) -> Result<Redirect, AppError> {
     let config = state.config();
     let database = state.database();
     let return_url = params.next.as_ref().unwrap_or(&config.login_redirect_to);
 
-    if session.is_authenticated().await {
+    if session.is_authenticated(database).await? {
         return Ok(Redirect::to(return_url));
     };
 
-    let authorize_url = CallbackValidation::new(hostname, config, config.google_scopes())?
+    let authorize_url = CallbackValidation::new(config, config.google_scopes())?
         .save(database, return_url)
         .await?
         .authorize_url();
@@ -48,21 +47,13 @@ pub async fn oauth_return<T: GoogleOauthCallbackHook + Send>(
     state: State<WebsiteState>,
     Extension(session): Extension<Session>,
     Query(params): Query<GoogleOauthParams>,
-    Host(hostname): Host,
 ) -> Result<Redirect, AppError> {
     let config = state.config();
     let database = state.database();
 
     let (pkce_code, return_url) = CallbackValidation::validate(params.state, database).await?;
 
-    let token_response = OauthTokenResponse::request(
-        config.google_client_id.clone(),
-        config.google_client_secret.clone(),
-        params.code,
-        pkce_code,
-        hostname,
-    )
-    .await?;
+    let token_response = OauthTokenResponse::login(config, params.code, pkce_code).await?;
 
     T::run(&token_response, session, &state).await?;
 

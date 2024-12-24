@@ -5,7 +5,7 @@ use sqlx::{migrate::Migrator, sqlite::SqliteConnectOptions, Sqlite, SqlitePool, 
 
 use crate::{log_and_wrap_custom_internal, service::AppError};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Database {
     storage: SqlitePool,
 }
@@ -139,7 +139,7 @@ impl TestDatabase {
 //     }
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IpsDatabase {
     storage: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
 }

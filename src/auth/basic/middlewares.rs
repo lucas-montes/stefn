@@ -8,9 +8,13 @@ use axum_extra::{headers::Cookie, TypedHeader};
 use std::net::SocketAddr;
 
 use super::services::set_session_cookies;
-use crate::{models::UserSession, service::AppError, sessions::Session, state::WebsiteState};
+use crate::{
+    database::Database, models::UserSession, service::AppError, sessions::Session,
+    state::WebsiteState,
+};
 
 pub async fn login_required_middleware(
+    database: State<Database>,
     session: Extension<Session>,
     mut request: Request,
     next: Next,
@@ -18,7 +22,7 @@ pub async fn login_required_middleware(
     //TODO: validate that the cookie is correct with hmac
     // TODO: check that the users exists and other validations
 
-    if session.is_authenticated().await {
+    if session.is_authenticated(&database).await? {
         request.extensions_mut().insert(session);
         return Ok(next.run(request).await);
     }
@@ -37,17 +41,20 @@ pub async fn sessions_middleware(
     let config = state.config();
 
     let current_session = match cookie.get(&config.session_cookie_name) {
-        Some(session_id) => sessions.find_session(session_id).await?,
+        Some(session_id) => {
+            sessions
+                .find_session(session_id, &config.session_key)
+                .await?
+        }
         None => None,
     };
-
+    //TODO: fix problem on the update of the sessions. somenthing mess up the time then the generated csrf token is different.
+    // also rm csrf token from the database?
     let session = match current_session {
         Some(session) => session,
         None => {
-            //TODO: how to handle no ip database
-            let country = state
-                .get_country_code_from_ip(&addr)
-                .unwrap_or("No-countries");
+            //TODO: improve overall
+            let country = state.get_country_code_from_ip(&addr).ok().map(|s| s.into());
 
             sessions
                 .create_session(
@@ -62,10 +69,10 @@ pub async fn sessions_middleware(
 
     request.extensions_mut().insert(session.clone());
     //Before the response
+
     let mut resp = next.run(request).await;
 
     set_session_cookies(resp.headers_mut(), &session, config).await?;
-    //TODO: something wrong with the session cookies when logedin from password
 
     Ok(resp)
 }

@@ -7,19 +7,29 @@ pub struct InputTag<'a> {
     type_: InputType,
     value: Option<String>,
     placeholder: Cow<'a, str>,
-    error: Option<Cow<'a, str>>,//TODO: handle errors and display them
+    error: Option<Cow<'a, str>>, //TODO: handle errors and display them
     required: bool,
 }
 
 impl<'a> InputTag<'a> {
-    pub fn new(attributes: BasicAttributes<'a>,
-    name: Cow<'a, str>,
-    type_: InputType,
-    value: Option<String>,
-    placeholder: Cow<'a, str>,
-    error: Option<Cow<'a, str>>,
-    required: bool,) -> Self {
-        Self { attributes, name, type_, value, placeholder, error, required }
+    pub fn new(
+        attributes: BasicAttributes<'a>,
+        name: Cow<'a, str>,
+        type_: InputType,
+        value: Option<String>,
+        placeholder: Cow<'a, str>,
+        error: Option<Cow<'a, str>>,
+        required: bool,
+    ) -> Self {
+        Self {
+            attributes,
+            name,
+            type_,
+            value,
+            placeholder,
+            error,
+            required,
+        }
     }
 }
 
@@ -89,12 +99,12 @@ impl<'a> FormTag<'a> {
         form
     }
 
-    pub fn set_method(mut self, method: &'a str)->Self{
+    pub fn set_method(mut self, method: &'a str) -> Self {
         self.method = Cow::Borrowed(method);
         self
     }
 
-    pub fn add_button(mut self, button:HtmlTag<'a> )->Self{
+    pub fn add_button(mut self, button: HtmlTag<'a>) -> Self {
         self.children.push(button);
         self
     }
@@ -134,7 +144,7 @@ pub enum ChildTag {
     P,
     Span,
     Th,
-    Td
+    Td,
 }
 
 impl fmt::Display for ChildTag {
@@ -157,32 +167,40 @@ pub struct GeneralChildTag<'a> {
 }
 
 impl<'a> GeneralChildTag<'a> {
-    pub fn new(tag: Option<ChildTag>,
+    pub fn new(
+        tag: Option<ChildTag>,
         attributes: BasicAttributes<'a>,
-        value: Cow<'a, str>,) -> Self {
-        Self { tag, attributes, value }
+        value: Cow<'a, str>,
+    ) -> Self {
+        Self {
+            tag,
+            attributes,
+            value,
+        }
     }
 
-    pub fn empty(value: Cow<'a, str>)->Self{
-        Self { tag:None, attributes: BasicAttributes::default(), value }
+    pub fn empty(value: Cow<'a, str>) -> Self {
+        Self {
+            tag: None,
+            attributes: BasicAttributes::default(),
+            value,
+        }
     }
 }
 
 impl<'a> fmt::Display for GeneralChildTag<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.tag {
-            Some(tag) => {write!(
-                f,
-                "<{tag} {attributes}>{value}</{tag}>",
-                tag = tag,
-                attributes = self.attributes,
-                value = self.value,
-            )},
-            None =>write!(
-                f,
-                "{value}",
-                value = self.value,
-            )
+            Some(tag) => {
+                write!(
+                    f,
+                    "<{tag} {attributes}>{value}</{tag}>",
+                    tag = tag,
+                    attributes = self.attributes,
+                    value = self.value,
+                )
+            }
+            None => write!(f, "{value}", value = self.value,),
         }
     }
 }
@@ -192,7 +210,7 @@ pub enum ParentTag {
     Div,
     Thead,
     Tbody,
-    Table
+    Table,
 }
 
 impl fmt::Display for ParentTag {
@@ -211,24 +229,36 @@ pub struct GeneralParentTag<'a> {
     tag: ParentTag,
     attributes: BasicAttributes<'a>,
     children: Vec<HtmlTag<'a>>,
-    type_: Option<Cow<'a, str>>
+    type_: Option<Cow<'a, str>>,
 }
 
 impl<'a> GeneralParentTag<'a> {
-    pub fn new(tag: ParentTag,
+    pub fn new(
+        tag: ParentTag,
         attributes: BasicAttributes<'a>,
-        children: Vec<HtmlTag<'a>>,) -> Self {
-        Self { tag, attributes, children, type_: None }
+        children: Vec<HtmlTag<'a>>,
+    ) -> Self {
+        Self {
+            tag,
+            attributes,
+            children,
+            type_: None,
+        }
     }
 
-    pub fn button(value: Cow<'a, str>, class: Cow<'a, str>)->Self{
-        let child =  GeneralChildTag::empty(value);
-        let mut attributes= BasicAttributes::default();
+    pub fn button(value: Cow<'a, str>, class: Cow<'a, str>) -> Self {
+        let child = GeneralChildTag::empty(value);
+        let mut attributes = BasicAttributes::default();
         attributes.class = class;
-        Self { tag:ParentTag::Button, attributes, children:vec![HtmlTag::ChildTag(child)], type_: Some(Cow::Borrowed("button")) }
+        Self {
+            tag: ParentTag::Button,
+            attributes,
+            children: vec![HtmlTag::ChildTag(child)],
+            type_: Some(Cow::Borrowed("button")),
+        }
     }
 
-    pub fn submit_button(value: Cow<'a, str>, class: Cow<'a, str>)->Self{
+    pub fn submit_button(value: Cow<'a, str>, class: Cow<'a, str>) -> Self {
         let mut button = Self::button(value, class);
         button.type_ = Some(Cow::Borrowed("submit"));
         button

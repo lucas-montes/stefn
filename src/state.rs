@@ -6,15 +6,17 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 use crate::{
     auth::{create_validator, Keys},
     broker::Broker,
-    config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
+    config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
+    mailing::Mailer,
     service::AppError,
     sessions::Sessions,
     website::Locale,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SharedState {
+    mailer: Mailer,
     database: Database,
     events_broker: Broker,
     ips_database: Option<IpsDatabase>,
@@ -27,7 +29,12 @@ impl SharedState {
         } else {
             Some(IpsDatabase::new(&config.ips_database_url))
         };
+        let mailer = match config.env {
+            Env::Test | Env::Development => Mailer::default(),
+            Env::Production => Mailer::new(&config),
+        };
         Self {
+            mailer,
             database: Database::new(&config.database_url),
             ips_database,
             events_broker: Broker::new(&config.broker_url),
@@ -43,7 +50,7 @@ impl SharedState {
     }
 }
 
-#[derive(Clone, FromRef)]
+#[derive(Clone, FromRef, Debug)]
 pub struct WebsiteState {
     secrets: WebsiteConfig,
     shared: SharedState,
@@ -57,7 +64,7 @@ impl WebsiteState {
             sessions: Sessions::new(&secrets.sessions_db),
             shared,
             secrets,
-            locale: Locale::new(),
+            locale: Locale::default(),
         }
     }
 
@@ -77,6 +84,10 @@ impl WebsiteState {
             return ips_database.get_country_code_from_ip(addr);
         }
         Err(AppError::IpDatabaseNotEnabled)
+    }
+
+    pub fn mailer(&self) -> &Mailer {
+        &self.shared.mailer
     }
 
     pub fn config(&self) -> &WebsiteConfig {
@@ -128,6 +139,7 @@ impl APIState {
     pub fn events_broker(&self) -> &Broker {
         &self.shared.events_broker
     }
+
     pub fn ips_database(&self) -> &IpsDatabase {
         &self.shared.ips_database.as_ref().unwrap()
     }

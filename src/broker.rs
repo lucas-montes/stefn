@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{log_and_wrap_custom_internal, service::AppError};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Broker {
     storage: SqlitePool,
 }

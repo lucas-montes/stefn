@@ -1,8 +1,2 @@
-#[derive(Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct Locale {}
-
-impl Locale {
-    pub fn new() -> Self {
-        Self {}
-    }
-}

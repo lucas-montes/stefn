@@ -1,9 +1,11 @@
+use std::time::Duration;
+
 use oauth2::{
     basic::{BasicClient, BasicTokenType},
-    reqwest::http_client,
+    reqwest::async_http_client,
     AccessToken, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
-    EmptyExtraTokenFields, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RevocationUrl, Scope,
-    StandardTokenResponse, TokenResponse, TokenUrl,
+    EmptyExtraTokenFields, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, RefreshToken,
+    RevocationUrl, Scope, StandardTokenResponse, TokenResponse, TokenUrl,
 };
 
 use reqwest::Url;
@@ -12,41 +14,67 @@ use crate::{
     config::WebsiteConfig, database::Database, log_and_wrap_custom_internal, service::AppError,
 };
 
+#[derive(Debug)]
 pub struct OauthTokenResponse(pub StandardTokenResponse<EmptyExtraTokenFields, BasicTokenType>);
 
 impl OauthTokenResponse {
     pub fn stub() -> Self {
-        Self(StandardTokenResponse::new(
+        let mut token = StandardTokenResponse::new(
             AccessToken::new("access_token".into()),
             BasicTokenType::Bearer,
             EmptyExtraTokenFields {},
-        ))
+        );
+        token.set_refresh_token(Some(RefreshToken::new("refresh_token".into())));
+        token.set_expires_in(Some(&Duration::new(3600, 0)));
+        Self(token)
     }
+
     pub fn access_token(&self) -> &str {
         self.0.access_token().secret()
     }
+
     pub fn refresh_token(&self) -> Option<&String> {
         self.0.refresh_token().map(|t| t.secret())
     }
-    pub async fn request(
-        google_client_id: String,
-        google_client_secret: String,
+
+    pub fn expires_in(&self) -> Option<i64> {
+        self.0.expires_in().map(|d| d.as_secs() as i64)
+    }
+
+    pub async fn login(
+        config: &WebsiteConfig,
         code: String,
         pkce_code: String,
-        hostname: String,
     ) -> Result<Self, AppError> {
-        let client = get_client(hostname, google_client_id, google_client_secret)?;
-        let code = AuthorizationCode::new(code);
-        tokio::task::spawn_blocking(move || {
-            client
-                .exchange_code(code)
-                .set_pkce_verifier(PkceCodeVerifier::new(pkce_code))
-                .request(http_client)
-        })
-        .await
-        .map_err(|e| log_and_wrap_custom_internal!(e))?
-        .map_err(|e| log_and_wrap_custom_internal!(e))
-        .map(Self)
+        let client = get_client(
+            config.build_url("/callback"),
+            config.google_client_id.clone(),
+            config.google_client_secret.clone(),
+        )?;
+        client
+            .exchange_code(AuthorizationCode::new(code))
+            .set_pkce_verifier(PkceCodeVerifier::new(pkce_code))
+            .request_async(async_http_client)
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))
+            .map(Self)
+    }
+
+    pub async fn new_token(
+        config: &WebsiteConfig,
+        refresh_token: String,
+    ) -> Result<Self, AppError> {
+        let client = get_client(
+            config.build_url("/callback"),
+            config.google_client_id.clone(),
+            config.google_client_secret.clone(),
+        )?;
+        client
+            .exchange_refresh_token(&RefreshToken::new(refresh_token))
+            .request_async(async_http_client)
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))
+            .map(Self)
     }
 }
 
@@ -83,22 +111,19 @@ impl CallbackValidation {
         Ok(query)
     }
 
-    pub fn new(
-        hostname: String,
-        config: &WebsiteConfig,
-        scopes: Vec<Scope>,
-    ) -> Result<Self, AppError> {
+    pub fn new(config: &WebsiteConfig, scopes: Vec<Scope>) -> Result<Self, AppError> {
         let client = get_client(
-            hostname,
+            config.build_url("/callback"),
             config.google_client_id.clone(),
             config.google_client_secret.clone(),
         )?;
 
         let (pkce_code_challenge, pkce_code_verifier) = PkceCodeChallenge::new_random_sha256();
-
+        //TODO: make it more modular. Maybe we dont want to prompt each every time.
         let (authorize_url, csrf_state) = client
             .authorize_url(CsrfToken::new_random)
             .add_extra_param("access_type", "offline")
+            .add_extra_param("prompt", "consent")
             .add_scopes(scopes)
             .set_pkce_challenge(pkce_code_challenge)
             .url();
@@ -134,8 +159,9 @@ impl CallbackValidation {
     }
 }
 
+//TODO: move this client to the state
 pub fn get_client(
-    hostname: String,
+    redirect_url: String,
     client_id: String,
     client_secret: String,
 ) -> Result<BasicClient, AppError> {
@@ -145,14 +171,6 @@ pub fn get_client(
         .map_err(|_| AppError::custom_internal("OAuth: invalid authorization endpoint URL"))?;
     let token_url = TokenUrl::new("https://oauth2.googleapis.com/token".to_string())
         .map_err(|_| AppError::custom_internal("OAuth: invalid token endpoint URL"))?;
-
-    let protocol = if hostname.starts_with("localhost") || hostname.starts_with("127.0.0.1") {
-        "http"
-    } else {
-        "https"
-    };
-
-    let redirect_url = format!("{}://{}/callback", protocol, hostname);
 
     // Set up the config for the Google OAuth2 process.
     let client = BasicClient::new(

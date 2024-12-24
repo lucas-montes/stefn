@@ -1,4 +1,6 @@
-use crate::{log_and_wrap_custom_internal, models::UserSession, service::AppError};
+use crate::{
+    database::Database, log_and_wrap_custom_internal, models::UserSession, service::AppError,
+};
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -14,14 +16,18 @@ use uuid::Uuid;
 
 type HmacSha256 = Hmac<Sha256>;
 
-#[derive(Clone)]
+//TODO: check this https://docs.rs/axum/latest/axum/middleware/struct.AddExtension.html
+
+#[derive(Clone, Debug)]
 pub struct Session(Arc<RwLock<SessionData>>);
 
-//TODO: fix the session cookies clean up and refresh and validation
-
 impl Session {
-    pub async fn is_authenticated(&self) -> bool {
-        self.0.read().await.user.is_some()
+    fn new(data: SessionData) -> Self {
+        Self(Arc::new(RwLock::new(data)))
+    }
+
+    pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
+        self.0.read().await.user.is_authenticated(database).await
     }
 
     pub async fn set_data<T: Serialize>(&self, data: &T) -> Result<(), AppError> {
@@ -50,6 +56,7 @@ impl Session {
     }
 
     pub async fn validate_csrf_token(&self, secret: &str, token: &str) -> Result<(), AppError> {
+        //TODO: use the constant time comparaison think to avoid some security problem
         if generate_token(secret, &self.0.read().await.get_token_data()).eq(token) {
             Ok(())
         } else {
@@ -58,7 +65,7 @@ impl Session {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Sessions(SqlitePool);
 //TODO: do we really need a second database?
 
@@ -84,10 +91,19 @@ impl Sessions {
         &self.0
     }
 
-    pub async fn find_session(&self, session_id: &str) -> Result<Option<Session>, AppError> {
+    pub async fn find_session(
+        &self,
+        session_id: &str,
+        secret: &str,
+    ) -> Result<Option<Session>, AppError> {
         SessionData::from_session_id(session_id, self.get_connection())
             .await
-            .map(|u| u.map(|u| Session(Arc::new(RwLock::new(u)))))
+            .map(|u| {
+                u.map(|mut s| {
+                    s.update_csrf_token(secret);
+                    Session::new(s)
+                })
+            })
     }
 
     pub async fn create_session(
@@ -95,17 +111,16 @@ impl Sessions {
         user: UserSession,
         session_expiration: u64,
         secret: &str,
-        country: &str,
+        country: Option<String>,
     ) -> Result<Session, AppError> {
         let session = SessionData::new(user, country, session_expiration, secret);
-
         session.save(self.get_connection()).await?;
         Ok(Session(Arc::new(RwLock::new(session))))
     }
 
     pub async fn reuse_current_as_new_one(
         &self,
-        session: Session,
+        session: &Session,
         user: UserSession,
         secret: &str,
     ) -> Result<(), AppError> {
@@ -113,10 +128,13 @@ impl Sessions {
             .0
             .write()
             .await
+            .delete(self.get_connection())
+            .await?
             .new_session_id()
-            .update_csrf_token(secret)
-            .update_user(user)
             .update_dates()
+            .update_csrf_token(secret)
+            //TODO: the orden of the date + token is important so the token has the new date. not pretty
+            .update_user(user)
             .save(self.get_connection())
             .await?;
         Ok(())
@@ -126,18 +144,24 @@ impl Sessions {
 #[derive(Debug, Deserialize, sqlx::FromRow, Clone)]
 pub struct SessionData {
     session_id: String,
-    #[sqlx(flatten, default)]
+    #[sqlx(flatten)]
     user: UserSession,
     last_accessed: NaiveDateTime,
     created_at: NaiveDateTime,
     expiration: NaiveDateTime,
+    #[sqlx(skip)]
     csrf_token: String,
     data: Option<Vec<u8>>,
-    country: String,
+    country: Option<String>,
 }
 
 impl SessionData {
-    fn new(user: UserSession, country: &str, session_expiration: u64, secret: &str) -> Self {
+    fn new(
+        user: UserSession,
+        country: Option<String>,
+        session_expiration: u64,
+        secret: &str,
+    ) -> Self {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -150,11 +174,12 @@ impl SessionData {
             last_accessed: today,
             created_at: today,
             expiration,
-            csrf_token: String::new(),
+            csrf_token: String::default(),
             data: None,
             country: country.into(),
         };
         session.update_csrf_token(secret);
+        //TODO: improve how token is created and set. this is a little convoluted
         session
     }
 
@@ -199,15 +224,23 @@ impl SessionData {
             .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
+    async fn delete(&mut self, conn: &SqlitePool) -> Result<&mut Self, AppError> {
+        sqlx::query("DELETE FROM web_sessions WHERE session_id = $1;")
+            .bind(&self.session_id)
+            .execute(conn)
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        Ok(self)
+    }
+
     async fn save(&self, conn: &SqlitePool) -> Result<i64, AppError> {
-        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, created_at, expiration, csrf_token, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);")
+        sqlx::query("INSERT INTO web_sessions(session_id, user_pk, groups, last_accessed, created_at, expiration, data, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);")
             .bind(&self.session_id)
             .bind(self.user.pk())
             .bind(self.user.groups().map(|u|u.to_string()))
             .bind(&self.last_accessed)
             .bind(&self.created_at)
             .bind(&self.expiration)
-            .bind(&self.csrf_token)
             .bind(&self.data)
             .bind(&self.country)
             .execute(conn)

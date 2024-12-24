@@ -7,6 +7,7 @@ use axum::{
 };
 use maxminddb::MaxMindDBError;
 use serde::{Deserialize, Serialize};
+use sqlx::error::DatabaseError;
 use utoipa::{ToResponse, ToSchema};
 
 pub type AppResult<T> = std::result::Result<Json<T>, AppError>;
@@ -61,6 +62,12 @@ pub enum AppError {
     JWTModified(ParseIntError),
     //
     DoesNotExist,
+    UniqueViolation(String),
+    ForeignKeyViolation(String),
+    NotNullViolation(String),
+    CheckViolation(String),
+    DatabaseError(String),
+
     //
     RoleError,
     Unauthorized,
@@ -90,6 +97,7 @@ impl AppError {
     pub fn custom_internal(message: &str) -> Self {
         Self::Custom(StatusCode::INTERNAL_SERVER_ERROR, message.to_owned())
     }
+
     pub fn custom_bad_request(message: &str) -> Self {
         Self::Custom(StatusCode::BAD_REQUEST, message.to_owned())
     }
@@ -100,32 +108,33 @@ impl IntoResponse for AppError {
         tracing::error!("{:?}", self);
 
         let (status, message) = match self {
-            AppError::ErrorHashingPassword(err) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, err.to_string())
-            }
-            AppError::WrongPassword(_err) => {
-                (StatusCode::NOT_FOUND, "Contraseña incorrecta".into())
-            }
+            Self::ErrorHashingPassword(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+            Self::WrongPassword(_err) => (StatusCode::NOT_FOUND, "Contraseña incorrecta".into()),
             //
-            AppError::JsonEnumDeserialization(err) => (StatusCode::BAD_REQUEST, err.to_string()),
-            AppError::JsonRejection(rejection) => (rejection.status(), rejection.body_text()),
+            Self::JsonEnumDeserialization(err) => (StatusCode::BAD_REQUEST, err.to_string()),
+            Self::JsonRejection(rejection) => (rejection.status(), rejection.body_text()),
 
-            AppError::JWTError(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
-            AppError::JWTModified(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
+            Self::JWTError(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
+            Self::JWTModified(err) => (StatusCode::UNAUTHORIZED, err.to_string()),
 
-            AppError::RoleError => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
+            Self::RoleError => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
+            Self::Unauthorized => (StatusCode::UNAUTHORIZED, "Not authorized".to_string()),
 
-            AppError::DoesNotExist => (StatusCode::NOT_FOUND, "Not found".into()),
+            Self::DoesNotExist => (StatusCode::NOT_FOUND, "Not found".into()),
+            Self::UniqueViolation(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::ForeignKeyViolation(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::NotNullViolation(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::CheckViolation(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
 
-            AppError::IpError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
-            AppError::IpDataNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "Ip wrong".into()),
-            AppError::IpDatabaseNotEnabled => (
+            Self::IpError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+            Self::IpDataNotFound => (StatusCode::INTERNAL_SERVER_ERROR, "Ip wrong".into()),
+            Self::IpDatabaseNotEnabled => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Ip database not enabled".into(),
             ),
 
-            AppError::Custom(status, message) => (status, message),
+            Self::Custom(status, message) => (status, message),
         };
 
         (status, Json(ErrorMessage { message })).into_response()
@@ -147,5 +156,43 @@ impl From<JsonRejection> for AppError {
 impl From<jsonwebtoken::errors::Error> for AppError {
     fn from(error: jsonwebtoken::errors::Error) -> Self {
         Self::JWTError(error)
+    }
+}
+
+impl From<sqlx::Error> for AppError {
+    fn from(error: sqlx::Error) -> Self {
+        match error {
+            sqlx::Error::Database(db_err) => {
+                // Check for specific database error codes
+                let sqlite_error = db_err.downcast_ref::<sqlx::sqlite::SqliteError>();
+                match sqlite_error.kind() {
+                    sqlx::error::ErrorKind::UniqueViolation => {
+                        AppError::UniqueViolation(db_err.message().to_string())
+                    }
+                    sqlx::error::ErrorKind::ForeignKeyViolation => {
+                        AppError::ForeignKeyViolation(db_err.message().to_string())
+                    }
+                    sqlx::error::ErrorKind::NotNullViolation => {
+                        AppError::NotNullViolation(db_err.message().to_string())
+                    }
+                    sqlx::error::ErrorKind::CheckViolation => {
+                        AppError::CheckViolation(db_err.message().to_string())
+                    }
+                    sqlx::error::ErrorKind::Other => {
+                        AppError::DatabaseError(db_err.message().to_string())
+                    }
+                    _ => AppError::DatabaseError(db_err.to_string()),
+                }
+            }
+            sqlx::Error::RowNotFound => AppError::DoesNotExist,
+            sqlx::Error::PoolTimedOut => {
+                AppError::DatabaseError("Database pool timed out".to_string())
+            }
+            sqlx::Error::Io(err) => AppError::DatabaseError(format!("IO error: {}", err)),
+            _ => {
+                // Fallback for other unhandled SQLx errors
+                AppError::custom_internal(&format!("Unhandled SQLx error: {}", error))
+            }
+        }
     }
 }

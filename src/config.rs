@@ -32,6 +32,9 @@ pub struct SharedConfig {
     pub broker_url: String,
     pub worker_threads: usize,
     pub max_blocking_threads: usize,
+    pub smtp_username: String,
+    pub smtp_password: String,
+    pub smtp_relay: String,
 }
 
 impl SharedConfig {
@@ -42,8 +45,12 @@ impl SharedConfig {
             ips_database_url: "".into(),
             broker_url: "./test-broker.sqlite".to_owned(),
             database_url: "./test.sqlite".to_owned(),
+
             worker_threads: 1,
             max_blocking_threads: 1,
+            smtp_username: "smtp_username".to_owned(),
+            smtp_password: "smtp_password".to_owned(),
+            smtp_relay: "smtp_relay".to_owned(),
         }
     }
 }
@@ -67,9 +74,24 @@ pub struct WebsiteConfig {
     captcha_secrect_key: String,
     pub email_validation: bool,
     pub email_validation_redirect: String,
+    pub email_default_sender: String,
+    pub stripe_public_key: String,
 }
 
 impl WebsiteConfig {
+    pub fn build_url(&self, path: &str) -> String {
+        let (protocol, domain) = if self.domain.starts_with("localhost")
+            || self.domain.starts_with("127.0.0.1")
+            || self.domain.starts_with("0.0.0.0")
+        {
+            ("http", &format!("{}:{}", self.domain, self.port))
+        } else {
+            ("https", &self.domain)
+        };
+
+        format!("{}://{}{}", protocol, domain, path)
+    }
+
     pub fn google_scopes(&self) -> Vec<Scope> {
         if self.google_scopes.is_empty() {
             return vec![
@@ -105,6 +127,8 @@ impl ServiceConfig for WebsiteConfig {
             captcha_secrect_key: "captcha_secrect_key".into(),
             email_validation: false,
             email_validation_redirect: "email_validation_redirect".into(),
+            email_default_sender: "email_default_sender@example.com".to_owned(),
+            stripe_public_key: "stripe_public_key".into(),
         }
     }
 

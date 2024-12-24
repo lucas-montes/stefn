@@ -1,31 +1,52 @@
+use std::sync::Arc;
+
 use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport,
-    AsyncTransport, Message, Tokio1Executor,
+    message::header::ContentType,
+    transport::smtp::{authentication::Credentials, client::Tls, response::Response},
+    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 
-async fn main() {
-    tracing_subscriber::fmt::init();
+use crate::{
+    config::{SharedConfig, WebsiteConfig},
+    log_and_wrap_custom_internal,
+    service::AppError,
+};
 
-    let email = Message::builder()
-        .from("NoBody <nobody@domain.tld>".parse().unwrap())
-        .to("Hei <hei@domain.tld>".parse().unwrap())
-        .subject("Happy new async year")
-        .header(ContentType::TEXT_PLAIN)
-        .body(String::from("Be happy with async!"))
-        .unwrap();
+#[derive(Clone, Debug)]
+pub struct Mailer(Arc<AsyncSmtpTransport<Tokio1Executor>>);
 
-    let creds = Credentials::new("smtp_username".to_owned(), "smtp_password".to_owned());
+impl Default for Mailer {
+    fn default() -> Self {
+        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+            AsyncSmtpTransport::<Tokio1Executor>::relay("0.0.0.0")
+                .unwrap()
+                .port(1025)
+                .tls(Tls::None)
+                .build();
+        Self(Arc::new(mailer))
+    }
+}
 
-    // Open a remote connection to gmail using STARTTLS
-    let mailer: AsyncSmtpTransport<Tokio1Executor> =
-        AsyncSmtpTransport::<Tokio1Executor>::starttls_relay("smtp.gmail.com")
-            .unwrap()
-            .credentials(creds)
-            .build();
+impl Mailer {
+    pub fn new(config: &SharedConfig) -> Self {
+        let creds = Credentials::new(config.smtp_username.clone(), config.smtp_password.clone());
 
-    // Send the email
-    match mailer.send(email).await {
-        Ok(_) => println!("Email sent successfully!"),
-        Err(e) => panic!("Could not send email: {e:?}"),
+        let mailer: AsyncSmtpTransport<Tokio1Executor> =
+            AsyncSmtpTransport::<Tokio1Executor>::relay(&config.smtp_relay)
+                .expect("Something went wrong with the smtp transport for the Mailer")
+                .credentials(creds)
+                .build();
+        Self(Arc::new(mailer))
+    }
+    pub fn sutb() -> Self {
+        Self::default()
+    }
+    pub async fn send(&self, message: &Message) -> Result<Response, AppError> {
+        let raw = message.formatted();
+        let envelope = message.envelope();
+        self.0
+            .send_raw(envelope, &raw)
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 }

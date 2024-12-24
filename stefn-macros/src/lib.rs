@@ -1,6 +1,75 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, ItemStruct, LitStr};
+use quote::{quote, ToTokens};
+use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, LitStr, Meta};
+
+#[proc_macro_derive(Insertable, attributes(table_name))]
+pub fn add_insertable(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let struct_name = input.ident;
+    let table_name = input
+        .attrs
+        .iter()
+        .find_map(|attr| {
+            if attr.path().is_ident("table_name") {
+                if let Meta::NameValue(v) = &attr.meta {
+                    return Some(v.value.to_token_stream().to_string());
+                }
+            }
+            None
+        })
+        .expect("Missing attribute: table_name");
+
+    let fields = if let Data::Struct(data_struct) = &input.data {
+        match &data_struct.fields {
+            Fields::Named(fields_named) => &fields_named.named,
+            _ => panic!("SaveToDb can only be used with named structs"),
+        }
+    } else {
+        panic!("SaveToDb can only be used with structs");
+    };
+
+    let field_names: Vec<_> = fields
+        .iter()
+        .map(|field| field.ident.as_ref().unwrap())
+        .collect();
+    let field_names_str = field_names
+        .iter()
+        .map(|ident| ident.to_string())
+        .collect::<Vec<String>>()
+        .join(",");
+    let dolars = (1..field_names.len())
+        .into_iter()
+        .map(|s| format!("${}", s))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    let expanded = quote! {
+        impl #struct_name {
+            pub fn insert_query()->String{
+                format!(
+                    "INSERT INTO {} ({}) VALUES ({})",
+                    #table_name,
+                    #field_names_str,
+                    #dolars
+                )
+            }
+
+            pub async fn save(&self, pool: &sqlx::SqlitePool) -> Result<(), sqlx::Error> {
+                let query = Self::insert_query();
+
+                sqlx::query(&query)
+                    #(.bind(&self.#field_names))*
+                    .execute(pool)
+                    .await?;
+
+                Ok(())
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
+}
 
 #[proc_macro_derive(CsrfProtected)]
 pub fn add_csrf_token_derive(input: TokenStream) -> TokenStream {

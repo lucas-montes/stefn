@@ -25,21 +25,28 @@ pub trait GoogleOauthCallbackHook {
         user_info: GoogleUserInfo,
     ) -> Result<Self::User, AppError>;
 
+    async fn user_found_hook(
+        database: &Database,
+        token_response: &OauthTokenResponse,
+        user: Self::User,
+    ) -> Result<Self::User, AppError>;
+
     async fn run(
         token_response: &OauthTokenResponse,
         session: Session,
         state: &WebsiteState,
     ) -> Result<(), AppError> {
+        let config = state.config();
         let access_token = token_response.access_token();
         let user_info = GoogleUserInfo::get(access_token).await?.validate_email()?;
         let database = state.database();
 
         let user = match Self::find_user(&user_info, database).await? {
-            Some(user) => user,
+            Some(user) => Self::user_found_hook(database, token_response, user).await?,
             None => Self::create_user(database, token_response, user_info).await?,
         };
 
-        Self::update_session(&state.config(), state.sessions(), session, user).await
+        Self::update_session(config, state.sessions(), session, user).await
     }
 
     async fn update_session(

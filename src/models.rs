@@ -4,7 +4,6 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{prelude::FromRow, sqlite::SqliteRow, Decode, Row, SqliteConnection, Type};
 
@@ -110,12 +109,19 @@ impl Groups {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize, Clone, Default)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 pub struct UserSession(Option<User>);
+
+impl Default for UserSession {
+    fn default() -> Self {
+        Self(None)
+    }
+}
 
 impl FromRow<'_, SqliteRow> for UserSession {
     fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
-        if row.is_empty() {
+        let pk: Option<i64> = row.try_get("user_pk")?;
+        if row.is_empty() || pk.is_none() {
             Ok(Self(None))
         } else {
             Ok(Self(Some(User::from_row(row)?)))
@@ -135,6 +141,20 @@ impl UserSession {
     pub fn is_some(&self) -> bool {
         self.0.is_some()
     }
+
+    pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
+        match &self.0 {
+            Some(user) => user.is_authenticated(database).await,
+            None => Ok(false),
+        }
+    }
+}
+
+#[derive(Debug, FromRow)]
+pub struct UserWithPassword {
+    #[sqlx(flatten)]
+    pub user: User,
+    pub password: String,
 }
 
 #[derive(FromRow, Debug, Deserialize, Serialize, Clone)]
@@ -146,17 +166,23 @@ pub struct User {
 // TODO: by default start with a user like this one to manage state and auth. Create a nice trait
 // and make it public so you can hook your own auth/state struct
 
-#[derive(Debug, FromRow)]
-pub struct UserWithPassword {
-    #[sqlx(flatten)]
-    pub user: User,
-    pub password: String,
-}
-
 impl User {
     pub fn for_session(self) -> UserSession {
         UserSession(Some(self))
     }
+
+    pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
+        let exists: (i64,) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL);",
+        )
+        .bind(&self.pk)
+        .fetch_one(database.get_connection())
+        .await
+        .map_err(|e| log_and_wrap_custom_internal!(e))?;
+
+        Ok(exists.0 == 1)
+    }
+
     pub async fn create(
         tx: &mut SqliteConnection,
         password: &str,
@@ -229,7 +255,7 @@ impl User {
         email: &str,
     ) -> Result<Option<UserWithPassword>, AppError> {
         sqlx::query_as(
-            "SELECT emails.user_pk as user_pk, GROUP_CONCAT(group_pk, ',') as groups, users.password
+            "SELECT emails.user_pk, GROUP_CONCAT(users_groups_m2m.group_pk, ',') as groups, users.password
                 FROM emails
                 INNER JOIN users ON users.pk = emails.user_pk
                 LEFT JOIN users_groups_m2m ON emails.user_pk = users_groups_m2m.user_pk
@@ -247,12 +273,22 @@ pub struct EmailAccount {
     pub pk: i64,
     #[sqlx(flatten)]
     pub user: User,
+    pub email: String,
+    //TODO: use the Email type in smartlink?
 }
 
 impl EmailAccount {
+    pub fn mail_server(&self) -> &str {
+        self.email.split_once("@").unwrap().1
+    }
+
+    pub fn username(&self) -> &str {
+        self.email.split_once("@").unwrap().0
+    }
+
     pub async fn get_by_email(database: &Database, email: &str) -> Result<Option<Self>, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, GROUP_CONCAT(group_pk, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
                 FROM emails
                 LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
                 WHERE emails.email = $1;",
@@ -265,7 +301,7 @@ impl EmailAccount {
 
     pub async fn get_by_pk(tx: &mut SqliteConnection, pk: i64) -> Result<Self, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, GROUP_CONCAT(group_pk, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
             FROM emails
             LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
             WHERE emails.pk = $1;",
@@ -279,7 +315,7 @@ impl EmailAccount {
     pub async fn create_primary_active(
         tx: &mut SqliteConnection,
         user: User,
-        email: &str,
+        email: String,
     ) -> Result<Self, AppError> {
         let activated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -292,19 +328,36 @@ impl EmailAccount {
     pub async fn create_primary(
         tx: &mut SqliteConnection,
         user: User,
-        email: &str,
+        email: String,
         activated_at: Option<i64>,
     ) -> Result<Self, AppError> {
         let pk = sqlx::query("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4);")
             .bind(1)
             .bind(user.pk)
             .bind(activated_at)
-            .bind(email)
+            .bind(&email)
             .execute(tx)
             .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())?;
-        Ok(Self { pk, user })
+        Ok(Self { pk, user, email })
+    }
+
+    pub async fn create(
+        tx: &mut SqliteConnection,
+        is_primary: bool,
+        user: User,
+        email: String,
+        activated_at: Option<i64>,
+    ) -> Result<Self, AppError> {
+        let pk = sqlx::query("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4);")
+            .bind(is_primary)
+            .bind(user.pk)
+            .bind(activated_at)
+            .bind(&email)
+            .execute(tx)
+            .await
+            .map(|q| q.last_insert_rowid())?;
+        Ok(Self { pk, user, email })
     }
 
     pub async fn set_to_active(self, tx: &mut SqliteConnection) -> Result<Self, AppError> {
@@ -317,7 +370,6 @@ impl EmailAccount {
             .bind(self.pk)
             .execute(tx)
             .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))
             .map(|q| q.last_insert_rowid())?;
         Ok(self)
     }
@@ -346,7 +398,7 @@ mod tests {
         let email_account = EmailAccount::create_primary_active(
             &mut tx,
             user,
-            "test_email_account_get_by_email@example.com",
+            "test_email_account_get_by_email@example.com".into(),
         )
         .await;
         tx.commit().await.unwrap();
@@ -385,7 +437,7 @@ mod tests {
         let account = EmailAccount::create_primary_active(
             &mut tx,
             user,
-            "test_find_by_email_with_password@example.com",
+            "test_find_by_email_with_password@example.com".into(),
         )
         .await
         .unwrap();
@@ -472,7 +524,7 @@ mod tests {
         let email_account = EmailAccount::create_primary_active(
             &mut tx,
             user,
-            "test_create_email_account@example.com",
+            "test_create_email_account@example.com".into(),
         )
         .await;
         tx.commit().await.unwrap();

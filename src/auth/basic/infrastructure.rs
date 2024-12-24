@@ -1,7 +1,11 @@
+use lettre::Message;
 use sqlx::SqliteConnection;
 use uuid::Uuid;
 
-use crate::{database::Database, log_and_wrap_custom_internal, service::AppError};
+use crate::{
+    config::WebsiteConfig, database::Database, log_and_wrap_custom_internal, mailing::Mailer,
+    service::AppError,
+};
 
 #[derive(Debug)]
 pub struct EmailValidationManager {
@@ -33,7 +37,23 @@ impl EmailValidationManager {
         Ok(Self { email_pk, slug })
     }
 
-    pub async fn send(self) -> Result<Self, AppError> {
+    pub async fn send(
+        self,
+        config: &WebsiteConfig,
+        mailer: &Mailer,
+        to: &str,
+    ) -> Result<Self, AppError> {
+        let body = format!(
+            "Please click the following link to validate your email: {}",
+            config.build_url(&format!("/email-validation/{}", self.slug))
+        );
+        let message = Message::builder()
+            .from(config.email_default_sender.parse().unwrap())
+            .to(to.parse().unwrap())
+            .subject("Welcome to Smartlink")
+            .body(body)
+            .expect("failed to build email");
+        mailer.send(&message).await?;
         Ok(self)
     }
 
@@ -44,7 +64,7 @@ impl EmailValidationManager {
             .execute(database.get_connection())
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
-        //TODO: if error because not unique cretreade self
+        //TODO: check that the slug is unique
         Ok(self)
     }
 }

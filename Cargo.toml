@@ -1,14 +1,19 @@
 [package]
 name = "stefn"
-version = "0.0.1"
-license = "MIT OR Apache-2.0"
-edition = "2021"
+version = "0.1.0"
 repository = "https://github.com/lucas-montes/stefn"
 authors = ["Lucas Montes <lluc23@hotmail.com>"]
 description = "An opinionated and blazingly fast meta framework"
 
+license.workspace = true
+edition.workspace = true
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+
 [dependencies]
-stefn-macros = { path = "./stefn-macros" }
+stefn-macros = { path = "./stefn-macros", version = "0.1.0" }
 
 tokio = { version = "1.38.0", features = ["full"] }
 

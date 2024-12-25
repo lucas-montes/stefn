@@ -1,7 +1,9 @@
 [package]
 name = "stefn-macros"
 version = "0.1.0"
-edition = "2021"
+description = "Macros for stefn"
+license.workspace = true
+edition.workspace = true
 
 [lib]
 proc-macro = true

@@ -39,7 +39,6 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
         .collect::<Vec<String>>()
         .join(",");
     let dolars = (1..field_names.len())
-        .into_iter()
         .map(|s| format!("${}", s))
         .collect::<Vec<String>>()
         .join(",");
@@ -143,12 +142,12 @@ fn to_html_form_derive<S: FormStyle>(input: TokenStream) -> TokenStream {
 
     let full_fields: Vec<_> = fields
         .iter()
-        .map(|field| process_field::<S>(&field, true))
+        .map(|field| process_field::<S>(field, true))
         .collect();
 
     let empty_fields: Vec<_> = fields
         .iter()
-        .map(|field| process_field::<S>(&field, false))
+        .map(|field| process_field::<S>(field, false))
         .collect();
 
     let button_class = S::button_form_class();
@@ -183,9 +182,9 @@ fn process_field<S: FormStyle>(
         .attrs
         .iter()
         .find(|attr| attr.path().is_ident("html"))
-        .and_then(|attr| Some(FormFieldAttributes::new(attr)))
+        .map(FormFieldAttributes::new)
         .unwrap_or_default()
-        .to_form_input::<S>(&field_name, include_value)
+        .to_form_input::<S>(field_name, include_value)
 }
 
 fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStream {
@@ -299,7 +298,7 @@ impl FormFieldAttributes {
             .id
             .as_ref()
             .map_or(field_name.to_string(), |i| i.value());
-        unique_id.push_str("-");
+        unique_id.push('-');
         unique_id.push_str(tag);
         quote! { #unique_id.into() }
     }
@@ -333,9 +332,9 @@ impl FormFieldAttributes {
         field_name: &syn::Ident,
         include_value: bool,
     ) -> proc_macro2::TokenStream {
-        let div_id = self.generate_id(&field_name, "div");
-        let input_id = self.generate_id(&field_name, "input");
-        let label_id = self.generate_id(&field_name, "label");
+        let div_id = self.generate_id(field_name, "div");
+        let input_id = self.generate_id(field_name, "input");
+        let label_id = self.generate_id(field_name, "label");
 
         let style = get_default_stream(&self.style);
         let type_ = self.resolve_type();

@@ -2851,7 +2851,7 @@ dependencies = [
 
 [[package]]
 name = "stefn"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "argon2",
  "askama",

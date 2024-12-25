@@ -78,7 +78,7 @@ impl Broker {
             .map_err(|e| log_and_wrap_custom_internal!(e))?
             .rows_affected();
 
-        let _ = tx
+        tx
             .commit()
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;

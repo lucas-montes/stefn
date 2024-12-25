@@ -1,13 +1,12 @@
 use std::sync::Arc;
 
 use lettre::{
-    message::header::ContentType,
     transport::smtp::{authentication::Credentials, client::Tls, response::Response},
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 
 use crate::{
-    config::{SharedConfig, WebsiteConfig},
+    config::SharedConfig,
     log_and_wrap_custom_internal,
     service::AppError,
 };

@@ -80,12 +80,12 @@ where
             .with_state(state)
     }
 
-    async fn list<'a>(config: State<WebsiteConfig>) -> AdminListTemplate<'a> {
+    async fn list<'a>(_config: State<WebsiteConfig>) -> AdminListTemplate<'a> {
         let meta = Meta::default();
         AdminListTemplate { meta }
     }
 
-    async fn post(Form(payload): Form<Self::Create>) -> Result<Redirect, AppError> {
+    async fn post(Form(_payload): Form<Self::Create>) -> Result<Redirect, AppError> {
         Ok(Self::post_redirect(2))
     }
 
@@ -113,9 +113,9 @@ where
     }
 
     async fn patch(
-        State(database): State<Database>,
+        State(_database): State<Database>,
         Path(model_pk): Path<i64>,
-        Form(payload): Form<Self::Update>,
+        Form(_payload): Form<Self::Update>,
     ) -> Result<Redirect, AppError> {
         Ok(Self::patch_redirect(model_pk))
     }

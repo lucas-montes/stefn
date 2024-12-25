@@ -1,7 +1,6 @@
 use axum::{
     async_trait,
     extract::{FromRef, FromRequest, Request},
-    http::{header::CONTENT_TYPE, StatusCode},
     response::{IntoResponse, Response},
     Extension, Form, RequestExt,
 };

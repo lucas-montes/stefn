@@ -1,4 +1,4 @@
-mod database;
 mod manager;
-pub use database::{Database, IpsDatabase, TestDatabase};
+mod service;
 pub use manager::{Manager, Where};
+pub use service::{Database, IpsDatabase, TestDatabase};

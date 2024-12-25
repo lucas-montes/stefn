@@ -9,6 +9,7 @@ use crate::{
 
 use super::tracing::{init_dev_tracing, init_prod_tracing};
 
+#[derive(Default)]
 pub struct ServicesOrquestrator {
     config: Option<SharedConfig>,
     services: Vec<Service>,
@@ -16,16 +17,9 @@ pub struct ServicesOrquestrator {
 }
 
 impl ServicesOrquestrator {
-    pub fn new(config: SharedConfig) -> Self {
+    pub fn new(config: Option<SharedConfig>) -> Self {
         Self {
-            config: Some(config),
-            services: Vec::new(),
-            run_migrations: false,
-        }
-    }
-    pub fn default() -> Self {
-        Self {
-            config: None,
+            config,
             services: Vec::new(),
             run_migrations: false,
         }

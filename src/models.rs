@@ -1,5 +1,6 @@
 use std::{
     error::Error,
+    fmt,
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -29,7 +30,7 @@ impl FromStr for Group {
 }
 
 impl Group {
-    fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         match self {
             Self::Admin => "Admin",
             Self::User => "User",
@@ -75,7 +76,7 @@ where
 
         // now you can parse this into your type (assuming there is a `FromStr`)
 
-        Ok(value.parse()?)
+        value.parse()
     }
 }
 
@@ -92,14 +93,18 @@ impl FromStr for Groups {
     }
 }
 
-impl Groups {
-    pub fn to_string(&self) -> String {
-        self.0
+impl fmt::Display for Groups {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let r: String = self
+            .0
             .iter()
             .filter_map(|&g| std::char::from_digit(g as u32, 10))
-            .collect()
+            .collect();
+        write!(f, "{}", r)
     }
+}
 
+impl Groups {
     fn push(&mut self, group: Group) {
         self.0.push(group);
     }
@@ -109,14 +114,8 @@ impl Groups {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Default)]
 pub struct UserSession(Option<User>);
-
-impl Default for UserSession {
-    fn default() -> Self {
-        Self(None)
-    }
-}
 
 impl FromRow<'_, SqliteRow> for UserSession {
     fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
@@ -175,7 +174,7 @@ impl User {
         let exists: (i64,) = sqlx::query_as(
             "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL);",
         )
-        .bind(&self.pk)
+        .bind(self.pk)
         .fetch_one(database.get_connection())
         .await
         .map_err(|e| log_and_wrap_custom_internal!(e))?;
@@ -227,7 +226,7 @@ impl User {
 
         sqlx::query("INSERT INTO users_groups_m2m (user_pk,  group_pk) VALUES ($1, $2);")
             .bind(self.pk)
-            .bind(group.clone() as i64)
+            .bind(group as i64)
             .execute(tx)
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;

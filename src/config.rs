@@ -70,8 +70,8 @@ pub struct WebsiteConfig {
     pub google_client_id: String,
     pub google_client_secret: String,
     google_scopes: String,
-    captcha_public_key: String,
-    captcha_secrect_key: String,
+    _captcha_public_key: String,
+    _captcha_secrect_key: String,
     pub email_validation: bool,
     pub email_validation_redirect: String,
     pub email_default_sender: String,
@@ -94,10 +94,10 @@ impl WebsiteConfig {
 
     pub fn google_scopes(&self) -> Vec<Scope> {
         if self.google_scopes.is_empty() {
-            return vec![
+            vec![
                 Scope::new("https://www.googleapis.com/auth/userinfo.email".into()),
                 Scope::new("https://www.googleapis.com/auth/userinfo.profile".into()),
-            ];
+            ]
         } else {
             self.google_scopes
                 .split(",")
@@ -123,8 +123,8 @@ impl ServiceConfig for WebsiteConfig {
             google_client_id: "".into(),
             google_client_secret: "".into(),
             google_scopes: "scope1,scope2".into(),
-            captcha_public_key: "captcha_public_key".into(),
-            captcha_secrect_key: "captcha_secrect_key".into(),
+            _captcha_public_key: "captcha_public_key".into(),
+            _captcha_secrect_key: "captcha_secrect_key".into(),
             email_validation: false,
             email_validation_redirect: "email_validation_redirect".into(),
             email_default_sender: "email_default_sender@example.com".to_owned(),

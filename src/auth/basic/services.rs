@@ -20,7 +20,6 @@ use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
     log_and_wrap_custom_internal,
-    mailing::Mailer,
     models::{EmailAccount, Group, User, UserWithPassword},
     service::AppError,
     sessions::{Session, Sessions},
@@ -64,7 +63,7 @@ pub trait Ingress {
             IngressProcess::Login => Self::login(&state, session, &params, input).await,
             IngressProcess::Register => Self::register(&state, session, &params, input).await,
         }
-        .map(|r| Redirect::to(r))
+        .map(Redirect::to)
     }
 
     async fn login<'a>(
@@ -79,14 +78,14 @@ pub trait Ingress {
 
         Self::handle_login_session(state.sessions(), session, config, user).await?;
 
-        Ok(Self::get_login_redirect(config, &params))
+        Ok(Self::get_login_redirect(config, params))
     }
 
     async fn validate_login<'a>(
         state: &'a WebsiteState,
         input: &'a IngressForm,
     ) -> Result<UserWithPassword, AppError> {
-        User::find_by_email_with_password(&state.database(), &input.email)
+        User::find_by_email_with_password(state.database(), &input.email)
             .await?
             .ok_or(AppError::DoesNotExist)
             .and_then(|u| verify_password(&input.password, &u.password).map(|_| u))
@@ -185,7 +184,7 @@ pub trait Ingress {
             .await
     }
 
-    fn get_register_redirect<'a>(config: &'a WebsiteConfig, params: &'a IngressParams) -> &'a str {
+    fn get_register_redirect<'a>(config: &'a WebsiteConfig, _params: &'a IngressParams) -> &'a str {
         if config.email_validation {
             &config.email_validation_redirect
         } else {
@@ -203,7 +202,7 @@ pub trait EmailValidation {
     ) -> Result<Redirect, AppError> {
         Self::validate_email(&state, session, slug)
             .await
-            .map(|r| Redirect::to(r))
+            .map(Redirect::to)
     }
 
     async fn validate_email<'a>(

@@ -86,7 +86,7 @@ pub trait Manager {
 
     async fn create(database: &Database) {
         //TODO: finish
-        let fields = vec![""].join(",");
+        let fields = [""].join(",");
         let values = (1..fields.len())
             .map(|v| v.to_string())
             .collect::<Vec<String>>()

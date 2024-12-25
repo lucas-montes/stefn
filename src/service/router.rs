@@ -3,7 +3,7 @@ use axum::{
     response::{Html, IntoResponse, Response},
     Router,
 };
-use hyper::header::{AUTHORIZATION, CONTENT_TYPE, COOKIE};
+use hyper::header::CONTENT_TYPE;
 use std::{
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
@@ -84,7 +84,7 @@ impl MakeRequestId for MyMakeRequestId {
             .to_string()
             .parse()
             .ok()
-            .map(|r| RequestId::new(r))
+            .map(RequestId::new)
     }
 }
 

@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Extension, Host, Query, State},
+    extract::{Extension, Query, State},
     response::Redirect,
 };
 use serde::Deserialize;

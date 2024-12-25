@@ -31,7 +31,7 @@ impl SharedState {
         };
         let mailer = match config.env {
             Env::Test | Env::Development => Mailer::default(),
-            Env::Production => Mailer::new(&config),
+            Env::Production => Mailer::new(config),
         };
         Self {
             mailer,
@@ -73,7 +73,7 @@ impl WebsiteState {
     }
 
     pub fn ips_database(&self) -> &IpsDatabase {
-        &self.shared.ips_database.as_ref().unwrap()
+        self.shared.ips_database.as_ref().unwrap()
     }
 
     pub fn get_country_code_from_ip(&self, addr: &SocketAddr) -> Result<&str, AppError> {
@@ -141,7 +141,7 @@ impl APIState {
     }
 
     pub fn ips_database(&self) -> &IpsDatabase {
-        &self.shared.ips_database.as_ref().unwrap()
+        self.shared.ips_database.as_ref().unwrap()
     }
 
     pub fn database(&self) -> &Database {

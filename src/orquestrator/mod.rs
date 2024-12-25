@@ -1,4 +1,4 @@
-mod orquestrator;
+mod service;
 mod tracing;
 
-pub use orquestrator::ServicesOrquestrator;
+pub use service::ServicesOrquestrator;

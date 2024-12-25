@@ -176,7 +176,7 @@ impl SessionData {
             expiration,
             csrf_token: String::default(),
             data: None,
-            country: country.into(),
+            country,
         };
         session.update_csrf_token(secret);
         //TODO: improve how token is created and set. this is a little convoluted
@@ -238,9 +238,9 @@ impl SessionData {
             .bind(&self.session_id)
             .bind(self.user.pk())
             .bind(self.user.groups().map(|u|u.to_string()))
-            .bind(&self.last_accessed)
-            .bind(&self.created_at)
-            .bind(&self.expiration)
+            .bind(self.last_accessed)
+            .bind(self.created_at)
+            .bind(self.expiration)
             .bind(&self.data)
             .bind(&self.country)
             .execute(conn)

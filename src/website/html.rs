@@ -7,7 +7,7 @@ pub struct InputTag<'a> {
     type_: InputType,
     value: Option<String>,
     placeholder: Cow<'a, str>,
-    error: Option<Cow<'a, str>>, //TODO: handle errors and display them
+    _error: Option<Cow<'a, str>>, //TODO: handle errors and display them
     required: bool,
 }
 
@@ -27,7 +27,7 @@ impl<'a> InputTag<'a> {
             type_,
             value,
             placeholder,
-            error,
+            _error: error,
             required,
         }
     }
@@ -43,7 +43,7 @@ impl<'a> fmt::Display for InputTag<'a> {
             self.type_,
             self.value.as_ref().map_or("", |f| f),
             self.placeholder,
-            self.required.then(|| "required").unwrap_or_default()
+            self.required.then_some("required").unwrap_or_default()
         )
     }
 }
@@ -248,8 +248,8 @@ impl<'a> GeneralParentTag<'a> {
 
     pub fn button(value: Cow<'a, str>, class: Cow<'a, str>) -> Self {
         let child = GeneralChildTag::empty(value);
-        let mut attributes = BasicAttributes::default();
-        attributes.class = class;
+        let  attributes = BasicAttributes::<'_> { class, ..Default::default() };
+
         Self {
             tag: ParentTag::Button,
             attributes,

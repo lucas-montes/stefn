@@ -1,9 +1,9 @@
 mod responses;
 mod router;
-mod service;
+mod services;
 
 mod versioning;
 
 pub use responses::{AppError, AppJson, AppResult, ErrorMessage};
 pub use router::get_router;
-pub use service::{shutdown_signal, Service, ServiceExt};
+pub use services::{shutdown_signal, Service, ServiceExt};

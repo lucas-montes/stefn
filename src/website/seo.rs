@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use crate::config::WebsiteConfig;
 
 #[derive(Debug)]
 pub struct Meta<'a> {

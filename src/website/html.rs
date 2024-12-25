@@ -248,7 +248,10 @@ impl<'a> GeneralParentTag<'a> {
 
     pub fn button(value: Cow<'a, str>, class: Cow<'a, str>) -> Self {
         let child = GeneralChildTag::empty(value);
-        let  attributes = BasicAttributes::<'_> { class, ..Default::default() };
+        let attributes = BasicAttributes::<'_> {
+            class,
+            ..Default::default()
+        };
 
         Self {
             tag: ParentTag::Button,
@@ -360,7 +363,7 @@ mod tests {
         let children = HtmlTag::Input(InputTag::default());
         let result = HtmlTag::Form(FormTag::new(vec![children]));
         assert_eq!(
-            &result.to_string(), 
+            &result.to_string(),
             "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><input id=\"\" class=\"\" style=\"\" name=\"\" type_=\"text\" value=\"\" placeholder=\"\" /></form>"
         );
     }

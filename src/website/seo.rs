@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-
 #[derive(Debug)]
 pub struct Meta<'a> {
     pub meta_title: Cow<'a, str>,

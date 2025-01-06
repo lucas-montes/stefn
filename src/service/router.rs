@@ -1,10 +1,13 @@
 use axum::{
     http::{HeaderValue, Request, StatusCode},
+    middleware,
     response::{Html, IntoResponse, Response},
+    routing::get,
     Router,
 };
 use hyper::header::CONTENT_TYPE;
 use std::{
+    future::ready,
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
@@ -63,9 +66,12 @@ where
             HeaderValue::from_static("application/octet-stream"),
         );
 
+    let metrics = setup_metrics_recorder();
     Router::new()
         .nest("/", routes)
         .fallback(error_404)
+        .route_layer(middleware::from_fn(track_metrics))
+        .route("/metrics", get(move || ready(metrics.render())))
         .layer(middleware)
         .with_state(state)
 }
@@ -76,6 +82,8 @@ struct MyMakeRequestId {
 }
 
 use std::sync::atomic::Ordering;
+
+use super::metrics::{setup_metrics_recorder, track_metrics};
 
 impl MakeRequestId for MyMakeRequestId {
     fn make_request_id<B>(&mut self, _request: &Request<B>) -> Option<RequestId> {

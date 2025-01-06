@@ -9,6 +9,7 @@ use crate::{
     config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig},
     database::{Database, IpsDatabase},
     mailing::Mailer,
+    payments::services::PaymentsProcessor,
     service::AppError,
     sessions::Sessions,
     website::Locale,
@@ -19,11 +20,17 @@ pub struct SharedState {
     mailer: Mailer,
     database: Database,
     events_broker: Broker,
+    payments_processor: Option<PaymentsProcessor>,
     ips_database: Option<IpsDatabase>,
 }
 
 impl SharedState {
     pub fn new(config: &SharedConfig) -> Self {
+        let payments_processor = if config.stripe_private_key.is_empty() {
+            None
+        } else {
+            Some(PaymentsProcessor::new(&config.stripe_private_key))
+        };
         let ips_database = if config.ips_database_url.is_empty() {
             None
         } else {
@@ -37,6 +44,7 @@ impl SharedState {
             mailer,
             database: Database::new(&config.database_url),
             ips_database,
+            payments_processor,
             events_broker: Broker::new(&config.broker_url),
         }
     }
@@ -70,6 +78,10 @@ impl WebsiteState {
 
     pub fn events_broker(&self) -> &Broker {
         &self.shared.events_broker
+    }
+
+    pub fn payments_processor(&self) -> &PaymentsProcessor {
+        self.shared.payments_processor.as_ref().unwrap()
     }
 
     pub fn ips_database(&self) -> &IpsDatabase {

@@ -1,3 +1,4 @@
+mod metrics;
 mod responses;
 mod router;
 mod services;

@@ -35,6 +35,7 @@ pub struct SharedConfig {
     pub smtp_username: String,
     pub smtp_password: String,
     pub smtp_relay: String,
+    pub stripe_private_key: String,
 }
 
 impl SharedConfig {
@@ -45,12 +46,12 @@ impl SharedConfig {
             ips_database_url: "".into(),
             broker_url: "./test-broker.sqlite".to_owned(),
             database_url: "./test.sqlite".to_owned(),
-
             worker_threads: 1,
             max_blocking_threads: 1,
             smtp_username: "smtp_username".to_owned(),
             smtp_password: "smtp_password".to_owned(),
             smtp_relay: "smtp_relay".to_owned(),
+            stripe_private_key: "stripe_private_key".into(),
         }
     }
 }
@@ -79,19 +80,6 @@ pub struct WebsiteConfig {
 }
 
 impl WebsiteConfig {
-    pub fn build_url(&self, path: &str) -> String {
-        let (protocol, domain) = if self.domain.starts_with("localhost")
-            || self.domain.starts_with("127.0.0.1")
-            || self.domain.starts_with("0.0.0.0")
-        {
-            ("http", &format!("{}:{}", self.domain, self.port))
-        } else {
-            ("https", &self.domain)
-        };
-
-        format!("{}://{}{}", protocol, domain, path)
-    }
-
     pub fn google_scopes(&self) -> Vec<Scope> {
         if self.google_scopes.is_empty() {
             vec![
@@ -144,8 +132,8 @@ impl ServiceConfig for WebsiteConfig {
         &self.domain
     }
 
-    fn print(&self) {
-        println!("http://{:?}:{:?}", &self.ip, &self.port)
+    fn port(&self) -> u16 {
+        self.port
     }
 }
 
@@ -187,8 +175,8 @@ impl ServiceConfig for APIConfig {
         &self.domain
     }
 
-    fn print(&self) {
-        println!("http://{:?}:{:?}", &self.ip, &self.port)
+    fn port(&self) -> u16 {
+        self.port
     }
 }
 
@@ -200,8 +188,30 @@ pub trait ServiceConfig {
     fn allowed_origins(&self) -> AllowedOrigins;
 
     fn domain(&self) -> &str;
+    fn port(&self) -> u16;
 
-    fn print(&self);
+    fn print(&self) {
+        println!("{}", self.build_url(""))
+    }
+
+    fn build_url(&self, path: &str) -> String {
+        let domain = self.domain();
+        let mut url = String::new();
+        if domain.starts_with("localhost")
+            || domain.starts_with("127.0.0.1")
+            || domain.starts_with("0.0.0.0")
+        {
+            url.push_str("http://");
+            url.push_str(domain);
+            url.push(':');
+            url.push_str(self.port().to_string().as_str());
+        } else {
+            url.push_str("https://");
+            url.push_str(domain);
+        }
+        url.push_str(path);
+        url
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -217,5 +227,58 @@ impl AllowedOrigins {
             .iter()
             .filter_map(|s| s.parse::<HeaderValue>().ok())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_url_external() {
+        let config = APIConfig {
+            ip: Ipv4Addr::new(0, 0, 0, 0),
+            port: 8000,
+            domain: "test.com".into(),
+            allowed_origins: "*".into(),
+            session_key: "session_key".to_owned(),
+            sessions_db: "./test-sessions.sqlite".to_owned(),
+            session_cookie_name: "session_id".to_owned(),
+            session_expiration: 30,
+        };
+
+        assert_eq!(config.build_url("/test"), "https://test.com/test");
+    }
+
+    #[test]
+    fn test_build_url_local() {
+        let config = APIConfig {
+            ip: Ipv4Addr::new(0, 0, 0, 0),
+            port: 8000,
+            domain: "localhost".into(),
+            allowed_origins: "*".into(),
+            session_key: "session_key".to_owned(),
+            sessions_db: "./test-sessions.sqlite".to_owned(),
+            session_cookie_name: "session_id".to_owned(),
+            session_expiration: 30,
+        };
+
+        assert_eq!(config.build_url("/test"), "http://localhost:8000/test");
+    }
+
+    #[test]
+    fn test_build_url_what_we_do_here() {
+        let config = APIConfig {
+            ip: Ipv4Addr::new(192, 168, 1, 10),
+            port: 8000,
+            domain: "192.168.1.10".into(),
+            allowed_origins: "*".into(),
+            session_key: "session_key".to_owned(),
+            sessions_db: "./test-sessions.sqlite".to_owned(),
+            session_cookie_name: "session_id".to_owned(),
+            session_expiration: 30,
+        };
+
+        assert_eq!(config.build_url("/test"), "https://192.168.1.10/test");
     }
 }

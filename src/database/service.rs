@@ -14,6 +14,7 @@ impl Database {
     pub fn new(url: &str) -> Self {
         let database_config = SqliteConnectOptions::from_str(url)
             .expect("Cannot connect to database")
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
             .create_if_missing(true);
 
         Self {
@@ -22,13 +23,7 @@ impl Database {
     }
 
     pub fn stub() -> Self {
-        let database_config = SqliteConnectOptions::from_str("test-database.sqlite")
-            .expect("Cannot connect to database")
-            .create_if_missing(true);
-
-        Self {
-            storage: SqlitePool::connect_lazy_with(database_config),
-        }
+        Self::new("test-database.sqlite")
     }
 
     pub async fn run_migrations(&self) {

@@ -11,7 +11,10 @@ use oauth2::{
 use reqwest::Url;
 
 use crate::{
-    config::{WebsiteConfig, ServiceConfig}, database::Database, log_and_wrap_custom_internal, service::AppError,
+    config::{ServiceConfig, WebsiteConfig},
+    database::Database,
+    log_and_wrap_custom_internal,
+    service::AppError,
 };
 
 #[derive(Debug)]

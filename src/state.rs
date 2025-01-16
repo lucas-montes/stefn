@@ -25,6 +25,10 @@ pub struct SharedState {
 }
 
 impl SharedState {
+    pub fn stub() -> Self {
+        Self::new(&SharedConfig::stub())
+    }
+
     pub fn new(config: &SharedConfig) -> Self {
         let payments_processor = if config.stripe_private_key.is_empty() {
             None

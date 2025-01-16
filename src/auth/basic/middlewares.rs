@@ -49,13 +49,11 @@ pub async fn sessions_middleware(
         None => None,
     };
     //TODO: fix problem on the update of the sessions. somenthing mess up the time then the generated csrf token is different.
-    // also rm csrf token from the database?
     let session = match current_session {
         Some(session) => session,
         None => {
             //TODO: improve overall
             let country = state.get_country_code_from_ip(&addr).ok().map(|s| s.into());
-
             sessions
                 .create_session(
                     UserSession::default(),

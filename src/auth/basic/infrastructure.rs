@@ -3,7 +3,10 @@ use sqlx::SqliteConnection;
 use uuid::Uuid;
 
 use crate::{
-    config::{WebsiteConfig, ServiceConfig}, database::Database, log_and_wrap_custom_internal, mailing::Mailer,
+    config::{ServiceConfig, WebsiteConfig},
+    database::Database,
+    log_and_wrap_custom_internal,
+    mailing::Mailer,
     service::AppError,
 };
 

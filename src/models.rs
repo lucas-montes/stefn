@@ -105,11 +105,11 @@ impl fmt::Display for Groups {
 }
 
 impl Groups {
-    fn push(&mut self, group: Group) {
+    pub fn push(&mut self, group: Group) {
         self.0.push(group);
     }
 
-    fn contains(&self, group: &Group) -> bool {
+    pub fn contains(&self, group: &Group) -> bool {
         self.0.contains(group)
     }
 }
@@ -129,6 +129,9 @@ impl FromRow<'_, SqliteRow> for UserSession {
 }
 
 impl UserSession {
+    pub fn as_ref(&self) -> Option<&User> {
+        self.0.as_ref()
+    }
     pub fn groups(&self) -> Option<&Groups> {
         self.0.as_ref().map(|u| &u.groups)
     }

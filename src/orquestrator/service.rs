@@ -1,4 +1,3 @@
-use menva::read_default_file;
 use tokio::task::JoinSet;
 
 use crate::{
@@ -25,10 +24,6 @@ impl ServicesOrquestrator {
         }
     }
 
-    pub fn load_environment_variables(self) -> Self {
-        read_default_file();
-        self
-    }
     pub fn set_config_from_env(mut self) -> Self {
         self.config = Some(SharedConfig::from_env());
         self

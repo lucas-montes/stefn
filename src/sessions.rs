@@ -43,6 +43,10 @@ impl Session {
             .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
+    pub async fn user(&self) -> UserSession {
+        self.0.read().await.user.to_owned()
+    }
+
     pub async fn user_pk(&self) -> Option<i64> {
         self.0.read().await.user.pk()
     }
@@ -67,7 +71,7 @@ impl Session {
 
 #[derive(Clone, Debug)]
 pub struct Sessions(SqlitePool);
-//TODO: do we really need a second database?
+//TODO: do we really need a second database? no, but hey, have fun
 
 impl Sessions {
     pub fn new(sessions_db: &str) -> Self {
@@ -124,6 +128,7 @@ impl Sessions {
         user: UserSession,
         secret: &str,
     ) -> Result<(), AppError> {
+        //TODO: this is shit
         session
             .0
             .write()

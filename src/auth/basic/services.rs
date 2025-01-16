@@ -15,6 +15,7 @@ use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;
 use serde::Deserialize;
 use sqlx::SqliteConnection;
+use validator::Validate;
 
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
@@ -23,7 +24,7 @@ use crate::{
     models::{EmailAccount, Group, User, UserWithPassword},
     service::AppError,
     sessions::{Session, Sessions},
-    state::WebsiteState,
+    state::WebsiteState, website::SecureForm,
 };
 
 use super::infrastructure::EmailValidationManager;
@@ -34,11 +35,11 @@ pub enum IngressProcess {
     Register,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Validate, Deserialize)]
 pub struct IngressForm {
+    #[validate(email)]
     email: String,
     password: String,
-    csrf_token: String,
     process: IngressProcess,
 }
 
@@ -53,12 +54,9 @@ pub trait Ingress {
         state: State<WebsiteState>,
         Extension(session): Extension<Session>,
         params: Query<IngressParams>,
-        Form(input): Form<IngressForm>,
+        input: SecureForm<IngressForm>,
     ) -> Result<Redirect, AppError> {
-        let config = state.config();
-        session
-            .validate_csrf_token(&config.session_key, &input.csrf_token)
-            .await?;
+        let input = input.data();
         match input.process {
             IngressProcess::Login => Self::login(&state, session, &params, input).await,
             IngressProcess::Register => Self::register(&state, session, &params, input).await,

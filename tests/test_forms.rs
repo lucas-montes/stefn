@@ -1,3 +1,4 @@
+
 use axum::{
     body::Body,
     http::{Request, StatusCode},
@@ -16,13 +17,18 @@ use stefn::{
     state::WebsiteState,
 };
 
-pub struct IngressService;
+struct FormulaireCompletedTemplate;
 
-impl Ingress for IngressService {}
+async fn save_proposal(
+    Path(slug): Path<String>,
+    database: State<Database>,
+    proposal: CaptchaForm<ProposalForm>,
+) -> Result<FormulaireCompletedTemplate, AppError> {
+    let proposal = proposal.data;
+    proposal.save(slug, &database).await?;
+    Ok(FormulaireCompletedTemplate {})
+}
 
-pub struct EmailValidationService;
-
-impl EmailValidation for EmailValidationService {}
 
 fn routes(state: WebsiteState) -> Router<WebsiteState> {
     Router::new()
@@ -41,17 +47,9 @@ async fn setup() -> StubService {
 }
 
 #[derive(Debug, Serialize)]
-pub enum IngressProcess {
-    Login,
-    Register,
-}
-
-#[derive(Debug, Serialize)]
 pub struct IngressFormTest {
     email: String,
     password: String,
-    csrf_token: String,
-    process: IngressProcess,
 }
 
 #[tokio::test]

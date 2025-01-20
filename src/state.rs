@@ -16,9 +16,13 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
+pub struct HttpClient(pub reqwest::Client);
+
+#[derive(Clone, Debug)]
 pub struct SharedState {
     mailer: Mailer,
     database: Database,
+    http_client: HttpClient,
     events_broker: Broker,
     payments_processor: Option<PaymentsProcessor>,
     ips_database: Option<IpsDatabase>,
@@ -46,6 +50,7 @@ impl SharedState {
         };
         Self {
             mailer,
+            http_client: HttpClient(reqwest::Client::new()),
             database: Database::new(&config.database_url),
             ips_database,
             payments_processor,
@@ -119,6 +124,11 @@ impl WebsiteState {
     }
 }
 
+impl FromRef<WebsiteState> for HttpClient {
+    fn from_ref(app_state: &WebsiteState) -> HttpClient {
+        app_state.shared.http_client.clone()
+    }
+}
 impl FromRef<WebsiteState> for Database {
     fn from_ref(app_state: &WebsiteState) -> Database {
         app_state.shared.database.clone()

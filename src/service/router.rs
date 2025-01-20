@@ -66,12 +66,12 @@ where
             HeaderValue::from_static("application/octet-stream"),
         );
 
-    let metrics = setup_metrics_recorder();
+    // let metrics = setup_metrics_recorder();
     Router::new()
         .nest("/", routes)
         .fallback(error_404)
-        .route_layer(middleware::from_fn(track_metrics))
-        .route("/metrics", get(move || ready(metrics.render())))
+        // .route_layer(middleware::from_fn(track_metrics))
+        // .route("/metrics", get(move || ready(metrics.render())))
         .layer(middleware)
         .with_state(state)
 }

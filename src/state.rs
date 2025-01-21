@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, ops::Deref};
 
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
@@ -17,6 +17,14 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub struct HttpClient(pub reqwest::Client);
+
+impl Deref for HttpClient {
+    type Target = reqwest::Client;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct SharedState {
@@ -89,8 +97,8 @@ impl WebsiteState {
         &self.shared.events_broker
     }
 
-    pub fn payments_processor(&self) -> &PaymentsProcessor {
-        self.shared.payments_processor.as_ref().unwrap()
+    pub fn payments_processor(&self) -> PaymentsProcessor {
+        self.shared.payments_processor.clone().unwrap()
     }
 
     pub fn ips_database(&self) -> &IpsDatabase {

@@ -1,4 +1,4 @@
-use std::{fmt::Debug, str::FromStr};
+use std::{fmt::Debug, ops::Deref, str::FromStr};
 
 use stripe::{
     CheckoutSession, CheckoutSessionId, CheckoutSessionMode, Client, CreateCheckoutSession,
@@ -9,6 +9,14 @@ use crate::{log_and_wrap_custom_internal, service::AppError};
 
 #[derive(Clone)]
 pub struct PaymentsProcessor(Client);
+
+impl Deref for PaymentsProcessor {
+    type Target = Client;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Debug for PaymentsProcessor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

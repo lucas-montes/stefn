@@ -1,5 +1,5 @@
 use stefn::website::html::ToForm;
-use stefn::ToForm;
+use stefn::{Insertable, ToForm};
 
 #[test]
 fn test_to_form_with_all_attributes() {
@@ -31,5 +31,25 @@ fn test_to_form_with_all_attributes() {
     assert_eq!(
         &UserCreate::to_empty_form().to_string(),
         "<form id=\"form-id\" class=\"form-class\" style=\"\" method=\"POST\" action=\"\"><div id=\"usernameField-div\" class=\"form-group\" style=\"\"><label id=\"usernameField-label\" class=\"form-label\" style=\"\">user_email</label><input id=\"usernameField-input\" class=\"form-control\" style=\"\" name=\"user_email\" type_=\"email\" value=\"\" placeholder=\"Enter your email\" /></div><button id=\"\" class=\"btn btn-primary\" style=\"\" type_=\"submit\">Save</button></form>"
+    );
+}
+
+#[test]
+fn test_insertable() {
+    #[derive(Insertable)]
+    #[table_name = "users"]
+    struct UserCreate {
+        email: String,
+        id: Option<i64>,
+    }
+
+    let user = UserCreate {
+        email: "test@example.com".into(),
+        id: None,
+    };
+
+    assert_eq!(
+        UserCreate::insert_query().to_string(),
+        "INSERT INTO \"users\" (email,id) VALUES ($1,$2)"
     );
 }

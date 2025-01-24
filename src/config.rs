@@ -77,6 +77,7 @@ pub struct WebsiteConfig {
     pub email_validation_redirect: String,
     pub email_default_sender: String,
     pub stripe_public_key: String,
+    pub stripe_webhook_secret: String
 }
 
 impl WebsiteConfig {
@@ -111,12 +112,13 @@ impl ServiceConfig for WebsiteConfig {
             google_client_id: "".into(),
             google_client_secret: "".into(),
             google_scopes: "scope1,scope2".into(),
-            captcha_public_key: "captcha_public_key".into(),
-            captcha_secrect_key: "captcha_secrect_key".into(),
+            captcha_public_key: "1x00000000000000000000AA".into(),
+            captcha_secrect_key: "1x0000000000000000000000000000000AA".into(),
             email_validation: false,
             email_validation_redirect: "email_validation_redirect".into(),
             email_default_sender: "email_default_sender@example.com".to_owned(),
             stripe_public_key: "stripe_public_key".into(),
+            stripe_webhook_secret: "stripe_webhook_secret".into()
         }
     }
 
@@ -195,6 +197,7 @@ pub trait ServiceConfig {
     }
 
     fn build_url(&self, path: &str) -> String {
+        //TODO: maybe use reqwest url or something better
         let domain = self.domain();
         let mut url = String::new();
         if domain.starts_with("localhost")

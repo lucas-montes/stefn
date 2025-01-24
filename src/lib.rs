@@ -11,4 +11,4 @@ pub mod sessions;
 pub mod state;
 pub mod website;
 
-pub use stefn_macros::ToForm;
+pub use stefn_macros::{Insertable, ToForm};

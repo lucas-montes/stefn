@@ -69,7 +69,7 @@ impl PaymentsProcessor {
         };
 
         params.line_items = Some(vec![CreateCheckoutSessionLineItems {
-            quantity: Some(1), //TODO: will this be always 1?
+            quantity: Some(1), //TODO: will this be always 1? no
             price: Some(price),
             ..Default::default()
         }]);

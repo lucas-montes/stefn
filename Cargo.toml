@@ -1,6 +1,6 @@
 [package]
 name = "stefn"
-version = "0.2.1"
+version = "0.3.1"
 repository = "https://github.com/lucas-montes/stefn"
 authors = ["Lucas Montes <lluc23@hotmail.com>"]
 description = "An opinionated and blazingly fast meta framework"
@@ -11,6 +11,9 @@ edition.workspace = true
 [workspace.package]
 edition = "2021"
 license = "Apache-2.0"
+
+[dev-dependencies]
+mockito = "1.6.1"
 
 [dependencies]
 stefn-macros = { path = "./stefn-macros", version = "0.1.0" }

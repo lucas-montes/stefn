@@ -23,10 +23,10 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
     let fields = if let Data::Struct(data_struct) = &input.data {
         match &data_struct.fields {
             Fields::Named(fields_named) => &fields_named.named,
-            _ => panic!("SaveToDb can only be used with named structs"),
+            _ => panic!("Insertable can only be used with named structs"),
         }
     } else {
-        panic!("SaveToDb can only be used with structs");
+        panic!("Insertable can only be used with structs");
     };
 
     let field_names: Vec<_> = fields
@@ -38,34 +38,35 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
         .map(|ident| ident.to_string())
         .collect::<Vec<String>>()
         .join(",");
-    let dolars = (1..field_names.len())
+    let dolars = (1..=field_names.len())
         .map(|s| format!("${}", s))
         .collect::<Vec<String>>()
         .join(",");
 
     let expanded = quote! {
-        impl #struct_name {
-            pub fn insert_query()->String{
-                format!(
-                    "INSERT INTO {} ({}) VALUES ({})",
-                    #table_name,
-                    #field_names_str,
-                    #dolars
-                )
-            }
-
-            pub async fn save(&self, pool: &sqlx::SqlitePool) -> Result<(), sqlx::Error> {
-                let query = Self::insert_query();
-
-                sqlx::query(&query)
-                    #(.bind(&self.#field_names))*
-                    .execute(pool)
-                    .await?;
-
-                Ok(())
-            }
+    impl #struct_name {
+        pub fn insert_query()->String{
+            format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                #table_name,
+                #field_names_str,
+                #dolars
+            )
         }
-    };
+
+        pub async fn save<'e, E>(&self, executor: E) -> Result<i64, stefn::service::AppError>
+        where
+            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        {
+            sqlx::query(&Self::insert_query())
+                #(.bind(&self.#field_names))*
+                .execute(executor)
+                .await
+                .map_err(stefn::service::AppError::from)
+                .map(|q| q.last_insert_rowid())
+        }
+            }
+        };
 
     TokenStream::from(expanded)
 }

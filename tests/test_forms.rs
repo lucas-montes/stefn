@@ -1,7 +1,7 @@
-
 use axum::{
     body::Body,
-    http::{Request, StatusCode}, Json,
+    http::{Request, StatusCode},
+    Json,
 };
 use axum::{
     middleware::from_fn_with_state,
@@ -12,9 +12,10 @@ use axum::{
 use http_body_util::BodyExt;
 use serde::{Deserialize, Serialize};
 use stefn::{
-    auth::{sessions_middleware},
+    auth::sessions_middleware,
     service::{AppError, Service, StubService},
-    state::WebsiteState, website::{ CaptchaForm, SecureForm},
+    state::WebsiteState,
+    website::{CaptchaForm, SecureForm},
 };
 use validator::Validate;
 
@@ -29,7 +30,9 @@ struct IngressFormCsrfTest {
 struct IngressFormCaptchaTest {
     email: String,
     password: String,
-    csrf_token : String,
+    csrf_token: String,
+    #[serde(rename = "cf-turnstile-response")]
+    cf_turnstile_response: String,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -38,26 +41,19 @@ struct IngressFormTest {
     password: String,
 }
 
-struct FormulaireCompletedTemplate;
-
-#[axum::debug_handler]
 async fn form_with_csrf_and_captcha(
-    _: Form<IngressFormTest>,
+    _: CaptchaForm<IngressFormTest>,
 ) -> Result<Json<i64>, AppError> {
     Ok(Json(0))
 }
-
-async fn form_with_csrf(
-    _: SecureForm<IngressFormTest>,
-) -> Result<Json<i64>, AppError> {
+async fn form_with_csrf(_: SecureForm<IngressFormTest>) -> Result<Json<i64>, AppError> {
     Ok(Json(0))
 }
-
 
 fn routes(state: WebsiteState) -> Router<WebsiteState> {
     Router::new()
-        .route("/catpcha", post(form_with_csrf_and_captcha))
         .route("/csrf", post(form_with_csrf))
+        .route("/captcha", post(form_with_csrf_and_captcha))
         .route("/set-headers", get(|| async { "Hello" }))
         .layer(from_fn_with_state(state.clone(), sessions_middleware))
         .with_state(state)
@@ -66,8 +62,6 @@ fn routes(state: WebsiteState) -> Router<WebsiteState> {
 async fn setup() -> StubService {
     StubService::new(Service::website("WEB_", routes)).await
 }
-
-
 
 #[tokio::test]
 async fn test_form_with_csrf() {
@@ -111,12 +105,7 @@ async fn test_form_with_csrf() {
         )
         .await;
 
-    println!("{:?}", &response);
-    println!(
-        "{:?}",
-        response.into_body().collect().await.unwrap().to_bytes()
-    );
-    // assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::OK);
 }
 
 #[tokio::test]
@@ -145,6 +134,7 @@ async fn test_form_with_csrf_and_captcha() {
             .unwrap()
             .0
             .replace("csrf_token=", ""),
+        cf_turnstile_response: "XXXX.DUMMY.TOKEN.XXXX".into(),
     };
     let body = Form(f).into_response().into_body();
 
@@ -152,10 +142,11 @@ async fn test_form_with_csrf_and_captcha() {
         .request(
             Request::builder()
                 .method("POST")
-                .uri("/catpcha")
+                .uri("/captcha")
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Cookie", csrf)
                 .header("Cookie", headers.next().unwrap())
+                .header("CF-Connecting-IP", "127.0.0.1")
                 .body(body)
                 .unwrap(),
         )

@@ -24,7 +24,8 @@ use crate::{
     models::{EmailAccount, Group, User, UserWithPassword},
     service::AppError,
     sessions::{Session, Sessions},
-    state::WebsiteState, website::SecureForm,
+    state::WebsiteState,
+    website::SecureForm,
 };
 
 use super::infrastructure::EmailValidationManager;

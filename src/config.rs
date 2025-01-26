@@ -77,7 +77,7 @@ pub struct WebsiteConfig {
     pub email_validation_redirect: String,
     pub email_default_sender: String,
     pub stripe_public_key: String,
-    pub stripe_webhook_secret: String
+    pub stripe_webhook_secret: String,
 }
 
 impl WebsiteConfig {
@@ -118,7 +118,7 @@ impl ServiceConfig for WebsiteConfig {
             email_validation_redirect: "email_validation_redirect".into(),
             email_default_sender: "email_default_sender@example.com".to_owned(),
             stripe_public_key: "stripe_public_key".into(),
-            stripe_webhook_secret: "stripe_webhook_secret".into()
+            stripe_webhook_secret: "stripe_webhook_secret".into(),
         }
     }
 

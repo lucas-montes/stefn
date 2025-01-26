@@ -204,7 +204,7 @@ impl User {
     }
 
     pub async fn create_active_default(tx: &mut SqliteConnection) -> Result<Self, AppError> {
-        Self::create_active(tx, "SDFdso34$hl#sdfj").await
+        Self::create_active(tx, "SDFddg186DFG&$dfg987qzXZCDf688sf4so34$hl#sdfj").await
     }
 
     pub async fn create_active(

@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use tokio::{net::TcpListener, signal};
 
 use crate::{
-    config::{APIConfig, ServiceConfig, SharedConfig, WebsiteConfig},
+    config::{APIConfig, ServiceConfig, WebsiteConfig},
     state::{APIState, SharedState, WebsiteState},
 };
 

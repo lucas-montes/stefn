@@ -32,7 +32,8 @@ pub fn init_dev_tracing() {
                 .json()
                 .log_internal_errors(true)
                 .with_file(true)
-                .with_line_number(true),
+                .with_line_number(true)
+                .with_span_events(FmtSpan::EXIT),
         )
         .init();
 }

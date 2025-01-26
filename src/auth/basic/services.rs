@@ -9,7 +9,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{header::SET_COOKIE, HeaderValue},
     response::Redirect,
-    Extension, Form,
+    Extension,
 };
 use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;

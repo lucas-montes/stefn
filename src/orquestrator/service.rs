@@ -35,6 +35,7 @@ impl ServicesOrquestrator {
     }
 
     pub fn init_dev_tracing(self) -> Self {
+        //TODO: this is shitty
         init_dev_tracing();
         self
     }

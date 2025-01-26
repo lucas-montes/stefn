@@ -1,13 +1,10 @@
 use axum::{
     http::{HeaderValue, Request, StatusCode},
-    middleware,
     response::{Html, IntoResponse, Response},
-    routing::get,
     Router,
 };
 use hyper::header::CONTENT_TYPE;
 use std::{
-    future::ready,
     sync::{atomic::AtomicU64, Arc},
     time::Duration,
 };
@@ -83,7 +80,7 @@ struct MyMakeRequestId {
 
 use std::sync::atomic::Ordering;
 
-use super::metrics::{setup_metrics_recorder, track_metrics};
+// use super::metrics::{setup_metrics_recorder, track_metrics};
 
 impl MakeRequestId for MyMakeRequestId {
     fn make_request_id<B>(&mut self, _request: &Request<B>) -> Option<RequestId> {

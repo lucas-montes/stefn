@@ -27,7 +27,7 @@ struct CloudflareCaptchaParams<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct CaptchaForm<T> {
+pub struct CaptchaForm<T: std::fmt::Debug> {
     #[serde(flatten)]
     pub data: T,
     #[serde(rename = "cf-turnstile-response")]
@@ -35,19 +35,19 @@ pub struct CaptchaForm<T> {
     csrf_token: String,
 }
 
-impl<T> CaptchaForm<T> {
+impl<T: std::fmt::Debug> CaptchaForm<T> {
     pub fn data(self) -> T {
         self.data
     }
 }
 
 #[async_trait]
-impl<S, T: Send> FromRequest<S> for CaptchaForm<T>
+impl<S, T> FromRequest<S> for CaptchaForm<T>
 where
     Form<CaptchaForm<T>>: FromRequest<S, Rejection = FormRejection>,
     WebsiteConfig: FromRef<S>,
     HttpClient: FromRef<S>,
-    T: DeserializeOwned + Validate,
+    T: DeserializeOwned + Validate + Send + std::fmt::Debug,
     S: Send + Sync,
 {
     type Rejection = AppError;

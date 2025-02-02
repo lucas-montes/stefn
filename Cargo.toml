@@ -60,6 +60,8 @@ lettre = { version = "0.11.11", features = ["tokio1", "tokio1-native-tls"] }
 async-stripe = { version = "0.39.1", features = ["runtime-tokio-hyper-rustls"] }
 validator = { version = "0.19", features = ["derive"] }
 http-body-util = "0.1.0"
+unicode-normalization = "0.1.24"
+regex = "1.11.1"
 
 [dependencies.cookie]
 version = "0.18"

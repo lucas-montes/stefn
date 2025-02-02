@@ -281,11 +281,17 @@ pub struct EmailAccount {
 
 impl EmailAccount {
     pub fn mail_server(&self) -> &str {
-        self.email.split_once("@").unwrap().1
+        self.email
+            .split_once("@")
+            .expect("The email address has no domain, did you forget the @?")
+            .1
     }
 
     pub fn username(&self) -> &str {
-        self.email.split_once("@").unwrap().0
+        self.email
+            .split_once("@")
+            .expect("The email address has no username, did you forget the @?")
+            .0
     }
 
     pub async fn get_by_email(database: &Database, email: &str) -> Result<Option<Self>, AppError> {

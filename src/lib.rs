@@ -10,5 +10,6 @@ pub mod service;
 pub mod sessions;
 pub mod state;
 pub mod website;
+pub mod utils;
 
 pub use stefn_macros::{Insertable, ToForm};

@@ -2,6 +2,7 @@ mod admin;
 mod forms;
 pub mod html;
 mod locale;
+pub mod views;
 mod seo;
 
 pub use admin::Admin;

@@ -59,7 +59,7 @@ pub enum AppError {
     JsonEnumDeserialization(serde_json::Error),
     //
     JWTError(jsonwebtoken::errors::Error),
-    JWTModified(ParseIntError),
+    JWTModified(ParseIntError), //TODO: wrong error
     //
     DoesNotExist,
     UniqueViolation(String),
@@ -78,6 +78,8 @@ pub enum AppError {
     //
     Custom(StatusCode, String),
 }
+
+
 
 #[macro_export]
 macro_rules! log_and_wrap_custom_internal {
@@ -101,15 +103,11 @@ impl AppError {
     pub fn custom_bad_request(message: &str) -> Self {
         Self::Custom(StatusCode::BAD_REQUEST, message.to_owned())
     }
-}
 
-impl IntoResponse for AppError {
-    fn into_response(self) -> Response {
-        tracing::error!("{:?}", self);
-
-        let (status, message) = match self {
+    pub fn get_status_code_and_message(self)->(StatusCode, String){
+        match self {
             Self::ErrorHashingPassword(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
-            Self::WrongPassword(_err) => (StatusCode::NOT_FOUND, "Contraseña incorrecta".into()),
+            Self::WrongPassword(err) => (StatusCode::NOT_FOUND, err.to_string()),
             //
             Self::JsonEnumDeserialization(err) => (StatusCode::BAD_REQUEST, err.to_string()),
             Self::JsonRejection(rejection) => (rejection.status(), rejection.body_text()),
@@ -135,7 +133,15 @@ impl IntoResponse for AppError {
             ),
 
             Self::Custom(status, message) => (status, message),
-        };
+        }
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        tracing::error!(error=?&self);
+
+        let (status, message) = self.get_status_code_and_message();
 
         (status, Json(ErrorMessage { message })).into_response()
     }
@@ -196,3 +202,7 @@ impl From<sqlx::Error> for AppError {
         }
     }
 }
+
+
+// impl std::error::Error for AppError{}
+// impl Display for AppError {}

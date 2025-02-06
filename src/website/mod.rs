@@ -2,8 +2,8 @@ mod admin;
 mod forms;
 pub mod html;
 mod locale;
-pub mod views;
 mod seo;
+pub mod views;
 
 pub use admin::Admin;
 pub use forms::{CaptchaForm, SecureForm};

@@ -91,7 +91,7 @@ impl Sessions {
             .expect("Migrations failed");
     }
 
-    pub fn get_connection(&self) -> &SqlitePool {
+    fn get_connection(&self) -> &SqlitePool {
         &self.0
     }
 
@@ -138,7 +138,7 @@ impl Sessions {
             .new_session_id()
             .update_dates()
             .update_csrf_token(secret)
-            //TODO: the orden of the date + token is important so the token has the new date. not pretty
+            //NOTE: the orden of the date + token is important so the token has the new date. not pretty
             .update_user(user)
             .save(self.get_connection())
             .await?;

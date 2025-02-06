@@ -1,4 +1,3 @@
-
 #[macro_export]
 macro_rules! create_view {
     ($name:ident,$fn_name:ident, $template_path:expr, {
@@ -28,7 +27,6 @@ macro_rules! create_view {
     };
 }
 
-
 #[macro_export]
 macro_rules! create_error_templates {
     ($not_found_template:expr, $internal_error_template:expr) => {
@@ -40,16 +38,14 @@ macro_rules! create_error_templates {
         #[template(path = $internal_error_template)]
         struct Error500;
 
-
         pub struct HtmlError(axum::http::StatusCode, String);
 
         impl ::axum::response::IntoResponse for HtmlError {
             fn into_response(self) -> ::axum::response::Response {
                 match self.0 {
-                    axum::http::StatusCode::NOT_FOUND => Error404{}.into_response(),
-                    _ => Error500{}.into_response()
+                    axum::http::StatusCode::NOT_FOUND => Error404 {}.into_response(),
+                    _ => Error500 {}.into_response(),
                 }
-                
             }
         }
 

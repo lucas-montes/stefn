@@ -48,7 +48,6 @@ pub async fn sessions_middleware(
         }
         None => None,
     };
-    //TODO: fix problem on the update of the sessions. somenthing mess up the time then the generated csrf token is different.
     let session = match current_session {
         Some(session) => session,
         None => {

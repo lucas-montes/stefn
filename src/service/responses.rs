@@ -79,8 +79,6 @@ pub enum AppError {
     Custom(StatusCode, String),
 }
 
-
-
 #[macro_export]
 macro_rules! log_and_wrap_custom_internal {
     ($e:expr) => {{
@@ -104,7 +102,7 @@ impl AppError {
         Self::Custom(StatusCode::BAD_REQUEST, message.to_owned())
     }
 
-    pub fn get_status_code_and_message(self)->(StatusCode, String){
+    pub fn get_status_code_and_message(self) -> (StatusCode, String) {
         match self {
             Self::ErrorHashingPassword(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             Self::WrongPassword(err) => (StatusCode::NOT_FOUND, err.to_string()),
@@ -202,7 +200,6 @@ impl From<sqlx::Error> for AppError {
         }
     }
 }
-
 
 // impl std::error::Error for AppError{}
 // impl Display for AppError {}

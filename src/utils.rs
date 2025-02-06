@@ -1,10 +1,8 @@
-use std::sync::LazyLock;
 use regex::Regex;
+use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
 
-
 /// Converts a given string to a URL-friendly slug, similar to Django's slugify.
-/// 
 /// If `allow_unicode` is false, the value is converted to ASCII-only characters
 /// using NFKD normalization and filtering out non-ASCII characters.
 /// When true, NFKC normalization is used.
@@ -18,9 +16,7 @@ pub fn slugify(value: &str, allow_unicode: bool) -> String {
         value.nfkc().collect::<String>()
     } else {
         // Use NFKD normalization, then remove non-ASCII characters.
-        value.nfkd()
-            .filter(|c| c.is_ascii())
-            .collect::<String>()
+        value.nfkd().filter(|c| c.is_ascii()).collect::<String>()
     };
 
     normalized.make_ascii_lowercase();
@@ -31,11 +27,9 @@ pub fn slugify(value: &str, allow_unicode: bool) -> String {
     // Replace spaces and repeated dashes with a single dash.
     let slug = RE_SEPARATOR.replace_all(&cleaned, "-");
 
-
     // Trim leading and trailing dashes and underscores.
     slug.trim_matches(|c| c == '-' || c == '_').to_owned()
 }
-
 
 #[cfg(test)]
 mod tests {

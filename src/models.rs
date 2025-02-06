@@ -129,6 +129,14 @@ impl FromRow<'_, SqliteRow> for UserSession {
 }
 
 impl UserSession {
+    pub fn new_authenticated(user: User) -> Self {
+        Self(Some(user))
+    }
+
+    pub fn new_anonymous() -> Self {
+        Self(None)
+    }
+
     pub fn as_ref(&self) -> Option<&User> {
         self.0.as_ref()
     }

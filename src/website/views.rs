@@ -32,19 +32,43 @@ macro_rules! create_error_templates {
     ($not_found_template:expr, $internal_error_template:expr) => {
         #[derive(askama::Template)]
         #[template(path = $not_found_template)]
-        struct Error404;
+        struct Error404<'a> {
+            meta: ::stefn::website::Meta<'a>,
+        }
 
         #[derive(askama::Template)]
         #[template(path = $internal_error_template)]
-        struct Error500;
+        struct Error500<'a> {
+            meta: ::stefn::website::Meta<'a>,
+        }
 
         pub struct HtmlError(axum::http::StatusCode, String);
+
+        impl HtmlError {
+            fn not_found<'a>() -> Error404<'a> {
+                let meta = ::stefn::website::Meta {
+                    meta_title: "Not Found".into(),
+                    ..Default::default()
+                };
+
+                Error404 { meta }
+            }
+
+            fn internal_error<'a>() -> Error500<'a> {
+                let meta = ::stefn::website::Meta {
+                    meta_title: "Server Error".into(),
+                    ..Default::default()
+                };
+
+                Error500 { meta }
+            }
+        }
 
         impl ::axum::response::IntoResponse for HtmlError {
             fn into_response(self) -> ::axum::response::Response {
                 match self.0 {
-                    axum::http::StatusCode::NOT_FOUND => Error404 {}.into_response(),
-                    _ => Error500 {}.into_response(),
+                    ::axum::http::StatusCode::NOT_FOUND => HtmlError::not_found().into_response(),
+                    _ => HtmlError::internal_error().into_response(),
                 }
             }
         }

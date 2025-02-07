@@ -61,6 +61,8 @@ pub enum AppError {
     JWTError(jsonwebtoken::errors::Error),
     JWTModified(ParseIntError), //TODO: wrong error
     //
+    TemplateError(askama::Error),
+    //
     DoesNotExist,
     UniqueViolation(String),
     ForeignKeyViolation(String),
@@ -104,6 +106,8 @@ impl AppError {
 
     pub fn get_status_code_and_message(self) -> (StatusCode, String) {
         match self {
+            Self::TemplateError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+
             Self::ErrorHashingPassword(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             Self::WrongPassword(err) => (StatusCode::NOT_FOUND, err.to_string()),
             //
@@ -160,6 +164,12 @@ impl From<JsonRejection> for AppError {
 impl From<jsonwebtoken::errors::Error> for AppError {
     fn from(error: jsonwebtoken::errors::Error) -> Self {
         Self::JWTError(error)
+    }
+}
+
+impl From<askama::Error> for AppError {
+    fn from(err: askama::Error) -> Self {
+        AppError::TemplateError(err)
     }
 }
 

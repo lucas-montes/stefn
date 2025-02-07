@@ -1,10 +1,7 @@
-use axum::async_trait;
-
 use crate::{database::Database, service::AppError, sessions::Session, state::WebsiteState};
 
 use super::{infrastructure::GoogleUserInfo, oauth::OauthTokenResponse};
 
-#[async_trait]
 pub trait GoogleOauthCallbackHook {
     type User: Send;
 

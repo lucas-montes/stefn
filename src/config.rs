@@ -6,6 +6,7 @@ use std::{net::Ipv4Addr, str::FromStr};
 #[derive(Debug, Clone)]
 pub enum Env {
     Development,
+    Staging,
     Production,
     Test,
 }
@@ -15,9 +16,10 @@ impl FromStr for Env {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "development" => Ok(Env::Development),
-            "production" => Ok(Env::Production),
-            "test" => Ok(Env::Test),
+            "dev" | "development" | "Development" => Ok(Env::Development),
+            "staging" | "Staging" => Ok(Env::Staging),
+            "prod" | "production" | "Production" => Ok(Env::Production),
+            "test" | "Test" => Ok(Env::Test),
             _ => Err(format!("Invalid value for enum Env: {}", s)),
         }
     }

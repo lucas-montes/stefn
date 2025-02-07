@@ -5,7 +5,6 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 use axum::{
-    async_trait,
     extract::{Path, Query, State},
     http::{header::SET_COOKIE, HeaderValue},
     response::Redirect,
@@ -49,7 +48,6 @@ pub struct IngressParams {
     next: Option<String>,
 }
 
-#[async_trait]
 pub trait Ingress {
     async fn route(
         state: State<WebsiteState>,
@@ -192,7 +190,6 @@ pub trait Ingress {
     }
 }
 
-#[async_trait]
 pub trait EmailValidation {
     async fn route(
         state: State<WebsiteState>,

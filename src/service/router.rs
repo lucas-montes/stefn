@@ -65,7 +65,7 @@ where
 
     // let metrics = setup_metrics_recorder();
     Router::new()
-        .nest("/", routes)
+        .merge(routes)
         .fallback(error_404)
         // .route_layer(middleware::from_fn(track_metrics))
         // .route("/metrics", get(move || ready(metrics.render())))

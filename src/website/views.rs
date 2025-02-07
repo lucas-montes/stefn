@@ -13,7 +13,7 @@ macro_rules! create_view {
             meta: ::stefn::website::Meta<'a>,
         }
 
-        pub async fn $fn_name<'a>() -> $name<'a> {
+        pub async fn $fn_name<'a>() -> HtmlResult {
             let meta = ::stefn::website::Meta {
                 meta_title: $title.into(),
                 meta_description: $description.into(),
@@ -22,7 +22,8 @@ macro_rules! create_view {
                 meta_url: $url.into(),
                 ..Default::default()
             };
-            $name { meta }
+            let template = $name { meta };
+            template_to_response(&template)
         }
     };
 }
@@ -30,19 +31,29 @@ macro_rules! create_view {
 #[macro_export]
 macro_rules! create_error_templates {
     ($not_found_template:expr, $internal_error_template:expr) => {
-        #[derive(askama::Template)]
+        #[derive(::askama::Template)]
         #[template(path = $not_found_template)]
         struct Error404<'a> {
             meta: ::stefn::website::Meta<'a>,
         }
 
-        #[derive(askama::Template)]
+        #[derive(::askama::Template)]
         #[template(path = $internal_error_template)]
         struct Error500<'a> {
             meta: ::stefn::website::Meta<'a>,
         }
 
-        pub struct HtmlError(axum::http::StatusCode, String);
+        #[derive(Debug)]
+        pub struct HtmlError(::axum::http::StatusCode, String);
+
+        pub fn template_to_response<T: ::askama::Template>(tmpl: &T) -> HtmlResult {
+            tmpl.render()
+                .map(::axum::response::Html)
+                .map_err(::stefn::service::AppError::TemplateError)
+                .map_err(HtmlError::from)
+        }
+
+        pub type HtmlResult = Result<::axum::response::Html<String>, HtmlError>;
 
         impl HtmlError {
             fn not_found<'a>() -> Error404<'a> {
@@ -66,10 +77,12 @@ macro_rules! create_error_templates {
 
         impl ::axum::response::IntoResponse for HtmlError {
             fn into_response(self) -> ::axum::response::Response {
-                match self.0 {
-                    ::axum::http::StatusCode::NOT_FOUND => HtmlError::not_found().into_response(),
-                    _ => HtmlError::internal_error().into_response(),
-                }
+                let template = match self.0 {
+                    ::axum::http::StatusCode::NOT_FOUND => HtmlError::not_found().render(),
+                    _ => HtmlError::internal_error().render(),
+                };
+
+                ::axum::response::Html(template.unwrap()).into_response()
             }
         }
 

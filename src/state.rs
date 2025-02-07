@@ -53,7 +53,7 @@ impl SharedState {
             Some(IpsDatabase::new(&config.ips_database_url))
         };
         let mailer = match config.env {
-            Env::Test | Env::Development => Mailer::default(),
+            Env::Test | Env::Development | Env::Staging => Mailer::default(),
             Env::Production => Mailer::new(config),
         };
         Self {

@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::{rejection::FormRejection, FromRef, FromRequest, Request},
     Extension, Form, RequestExt,
 };
@@ -41,7 +40,6 @@ impl<T: std::fmt::Debug> CaptchaForm<T> {
     }
 }
 
-#[async_trait]
 impl<S, T> FromRequest<S> for CaptchaForm<T>
 where
     Form<CaptchaForm<T>>: FromRequest<S, Rejection = FormRejection>,
@@ -127,7 +125,6 @@ impl<T> SecureForm<T> {
     }
 }
 
-#[async_trait]
 impl<S, T: Send> FromRequest<S> for SecureForm<T>
 where
     Form<SecureForm<T>>: FromRequest<S, Rejection = FormRejection>,

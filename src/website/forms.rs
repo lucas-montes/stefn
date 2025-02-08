@@ -1,6 +1,9 @@
 use axum::{
-    extract::{rejection::FormRejection, FromRef, FromRequest, Request},
-    Extension, Form, RequestExt,
+    extract::{
+        rejection::{FormRejection, JsonRejection},
+        FromRef, FromRequest, Request,
+    },
+    Extension, Form, Json, RequestExt,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use validator::Validate;
@@ -148,6 +151,59 @@ where
         //     TODO: check also the cookies from the headers
 
         let Form(payload) = Form::<SecureForm<T>>::from_request(req, _state)
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        let config = WebsiteConfig::from_ref(_state);
+
+        session
+            .validate_csrf_token(&config.session_key, &payload.csrf_token)
+            .await?;
+
+        payload
+            .data
+            .validate()
+            .map_err(|e| log_and_wrap_custom_internal!(e))?; //TODO: return a 4xx
+
+        Ok(payload)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SecureJson<T> {
+    #[serde(flatten)]
+    data: T,
+    csrf_token: String,
+}
+
+impl<T> SecureJson<T> {
+    pub fn data(self) -> T {
+        self.data
+    }
+}
+
+impl<S, T: Send> FromRequest<S> for SecureJson<T>
+where
+    Json<SecureJson<T>>: FromRequest<S, Rejection = JsonRejection>,
+    WebsiteConfig: FromRef<S>,
+    T: DeserializeOwned + Validate,
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request(mut req: Request, _state: &S) -> Result<Self, Self::Rejection> {
+        let session = req
+            .extract_parts::<Extension<Session>>()
+            .await
+            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+
+        // let content_type = req
+        //     .headers()
+        //     .get(CONTENT_TYPE)
+        //     .and_then(|value| value.to_str().ok())
+        //     .ok_or_else(|| StatusCode::BAD_REQUEST.into_response())?;
+        //     TODO: check also the cookies from the headers
+
+        let Json(payload) = Json::<SecureJson<T>>::from_request(req, _state)
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
         let config = WebsiteConfig::from_ref(_state);

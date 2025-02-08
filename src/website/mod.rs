@@ -4,6 +4,6 @@ mod locale;
 mod seo;
 pub mod views;
 
-pub use forms::{CaptchaForm, SecureForm};
+pub use forms::{CaptchaForm,SecureJson, SecureForm};
 pub use locale::Locale;
 pub use seo::Meta;

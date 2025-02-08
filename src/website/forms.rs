@@ -62,8 +62,7 @@ where
         let cf_ip = req
             .headers()
             .get("CF-Connecting-IP")
-            .map(|v| v.to_str().ok())
-            .flatten()
+            .and_then(|v| v.to_str().ok())
             .map(|v| v.to_owned());
 
         // let content_type = req

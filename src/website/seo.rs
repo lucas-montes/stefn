@@ -10,7 +10,7 @@ pub struct Meta<'a> {
     pub twitter: TwitterMetadata<'a>,
 }
 
-impl<'a> Default for Meta<'a> {
+impl Default for Meta<'_> {
     fn default() -> Self {
         let package_name = env!("CARGO_PKG_NAME");
         let authors = env!("CARGO_PKG_AUTHORS");

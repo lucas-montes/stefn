@@ -2,7 +2,6 @@ use std::{net::SocketAddr, ops::Deref};
 
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
-use sqlx::Sqlite;
 
 use crate::{
     auth::{create_validator, Keys},

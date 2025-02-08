@@ -33,7 +33,7 @@ impl<'a> InputTag<'a> {
     }
 }
 
-impl<'a> fmt::Display for InputTag<'a> {
+impl fmt::Display for InputTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -123,7 +123,7 @@ impl<'a> FormTag<'a> {
     }
 }
 
-impl<'a> fmt::Display for FormTag<'a> {
+impl fmt::Display for FormTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -188,7 +188,7 @@ impl<'a> GeneralChildTag<'a> {
     }
 }
 
-impl<'a> fmt::Display for GeneralChildTag<'a> {
+impl fmt::Display for GeneralChildTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.tag {
             Some(tag) => {
@@ -268,7 +268,7 @@ impl<'a> GeneralParentTag<'a> {
     }
 }
 
-impl<'a> fmt::Display for GeneralParentTag<'a> {
+impl fmt::Display for GeneralParentTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "<{} {}", self.tag, self.attributes)?;
         if let Some(type_) = &self.type_ {
@@ -295,7 +295,7 @@ impl<'a> BasicAttributes<'a> {
     }
 }
 
-impl<'a> fmt::Display for BasicAttributes<'a> {
+impl fmt::Display for BasicAttributes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -312,7 +312,7 @@ pub enum HtmlTag<'a> {
     ChildTag(GeneralChildTag<'a>),
 }
 
-impl<'a> fmt::Display for HtmlTag<'a> {
+impl fmt::Display for HtmlTag<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Form(tag) => {

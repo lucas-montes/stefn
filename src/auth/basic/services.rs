@@ -13,7 +13,7 @@ use axum::{
 use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;
 use serde::Deserialize;
-use sqlx::{PgConnection, SqliteConnection};
+use sqlx::PgConnection;
 use validator::Validate;
 
 use crate::{
@@ -209,8 +209,8 @@ pub trait EmailValidation {
         let database = state.database();
         let config = state.config();
         let mut tx = database.start_transaction().await?;
-        let validation = EmailValidationManager::delete_and_get_email_pk(slug, &mut *tx).await?;
-        let user = Self::activate_user(validation, &mut *tx).await?;
+        let validation = EmailValidationManager::delete_and_get_email_pk(slug, &mut tx).await?;
+        let user = Self::activate_user(validation, &mut tx).await?;
         tx.commit()
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;

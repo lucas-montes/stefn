@@ -92,7 +92,7 @@ impl CallbackValidation {
         params_state: String,
         database: &Database,
     ) -> Result<(String, String), AppError> {
-        let mut tx: sqlx::Transaction<'_, sqlx::Sqlite> = database.start_transaction().await?;
+        let mut tx = database.start_transaction().await?;
 
         let csrf_state = CsrfToken::new(params_state);
 

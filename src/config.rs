@@ -46,8 +46,8 @@ impl SharedConfig {
             env: Env::Test,
             max_upload_size: 10485760,
             ips_database_url: "".into(),
-            broker_url: "./test-broker.sqlite".to_owned(),
-            database_url: "./test.sqlite".to_owned(),
+            broker_url: "./test-db-broker".to_owned(),
+            database_url: "./test-db".to_owned(),
             worker_threads: 1,
             max_blocking_threads: 1,
             smtp_username: "smtp_username".to_owned(),
@@ -70,14 +70,18 @@ pub struct WebsiteConfig {
     pub session_expiration: i64,
     pub login_redirect_to: String,
     pub csrf_cookie_name: String,
+    //Note: google oauth
     pub google_client_id: String,
     pub google_client_secret: String,
     google_scopes: String,
+    // Note: currently cloudflare reCaptcha
     pub captcha_public_key: String,
     pub captcha_secrect_key: String,
+
     pub email_validation: bool,
     pub email_validation_redirect: String,
     pub email_default_sender: String,
+    // Note: stripe payments
     pub stripe_public_key: String,
     pub stripe_webhook_secret: String,
 }
@@ -106,7 +110,7 @@ impl ServiceConfig for WebsiteConfig {
             domain: "test.com".into(),
             allowed_origins: "*".into(),
             session_key: "session_key".into(),
-            sessions_db: "./test-sessions.sqlite".into(),
+            sessions_db: "./test-db-sessions".into(),
             session_cookie_name: "session_id".into(),
             csrf_cookie_name: "csrf_token".into(),
             session_expiration: 30,

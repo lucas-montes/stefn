@@ -97,7 +97,6 @@ where
             idempotency_key: None,
         };
         let verification: CloudflareCaptchaResponse = http_client
-            .0
             .post("https://challenges.cloudflare.com/turnstile/v0/siteverify")
             .json(&form)
             .send()

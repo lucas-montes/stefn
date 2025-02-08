@@ -13,7 +13,7 @@ use axum::{
 use cookie::{time::Duration, SameSite};
 use hyper::HeaderMap;
 use serde::Deserialize;
-use sqlx::SqliteConnection;
+use sqlx::{PgConnection, SqliteConnection};
 use validator::Validate;
 
 use crate::{
@@ -82,7 +82,7 @@ pub trait Ingress {
         state: &'a WebsiteState,
         input: &'a IngressForm,
     ) -> Result<UserWithPassword, AppError> {
-        User::find_by_email_with_password(state.database(), &input.email)
+        User::find_by_email_with_password(&input.email, state.database())
             .await?
             .ok_or(AppError::DoesNotExist)
             .and_then(|u| verify_password(&input.password, &u.password).map(|_| u))
@@ -143,13 +143,13 @@ pub trait Ingress {
             )
         };
 
-        let user = User::create(&mut tx, &password, activated_at)
+        let user = User::create(&password, activated_at, &mut *tx)
             .await?
-            .add_to_group(Group::User, &mut tx)
+            .add_to_group(Group::User, &mut *tx)
             .await?;
 
         let email_account =
-            EmailAccount::create_primary(&mut tx, user, input.email, activated_at).await?;
+            EmailAccount::create_primary(user, input.email, activated_at, &mut *tx).await?;
 
         tx.commit().await?;
         Ok(email_account)
@@ -209,8 +209,8 @@ pub trait EmailValidation {
         let database = state.database();
         let config = state.config();
         let mut tx = database.start_transaction().await?;
-        let validation = EmailValidationManager::delete_and_get_email_pk(&mut tx, slug).await?;
-        let user = Self::activate_user(&mut tx, validation).await?;
+        let validation = EmailValidationManager::delete_and_get_email_pk(slug, &mut *tx).await?;
+        let user = Self::activate_user(validation, &mut *tx).await?;
         tx.commit()
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
@@ -220,14 +220,14 @@ pub trait EmailValidation {
     }
 
     async fn activate_user<'a>(
-        tx: &mut SqliteConnection,
         validation: EmailValidationManager,
+        tx: &mut PgConnection,
     ) -> Result<EmailAccount, AppError> {
-        let email = EmailAccount::get_by_pk(tx, validation.email_pk)
+        let email = EmailAccount::get_by_pk(validation.email_pk, &mut *tx)
             .await?
-            .set_to_active(tx)
+            .set_to_active(&mut *tx)
             .await?;
-        email.user.set_to_active(tx).await?;
+        email.user.set_to_active(&mut *tx).await?;
         Ok(email)
     }
 

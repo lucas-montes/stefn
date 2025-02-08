@@ -2,6 +2,7 @@ use std::{net::SocketAddr, ops::Deref};
 
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
+use sqlx::Sqlite;
 
 use crate::{
     auth::{create_validator, Keys},
@@ -16,7 +17,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub struct HttpClient(pub reqwest::Client);
+pub struct HttpClient(reqwest::Client);
 
 impl Deref for HttpClient {
     type Target = reqwest::Client;

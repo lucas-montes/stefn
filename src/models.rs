@@ -6,7 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use sqlx::{prelude::FromRow, sqlite::SqliteRow, Decode, Row, SqliteConnection, Type};
+use sqlx::{postgres::PgRow, prelude::FromRow, sqlite::SqliteRow, Decode, PgExecutor, Row, Type};
 
 use crate::{database::Database, log_and_wrap_custom_internal, service::AppError};
 
@@ -43,6 +43,13 @@ pub struct Groups(Vec<Group>);
 
 impl FromRow<'_, SqliteRow> for Groups {
     fn from_row(row: &SqliteRow) -> sqlx::Result<Self> {
+        let groups: String = row.try_get("groups")?;
+        Ok(groups.parse().unwrap())
+    }
+}
+
+impl FromRow<'_, PgRow> for Groups {
+    fn from_row(row: &PgRow) -> sqlx::Result<Self> {
         let groups: String = row.try_get("groups")?;
         Ok(groups.parse().unwrap())
     }
@@ -182,63 +189,65 @@ impl User {
     }
 
     pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
-        let exists: (i64,) = sqlx::query_as(
+        let exists: i64 = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL);",
         )
         .bind(self.pk)
-        .fetch_one(database.get_connection())
-        .await
-        .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        .fetch_one(&**database)
+        .await?;
 
-        Ok(exists.0 == 1)
+        Ok(exists == 1)
     }
 
-    pub async fn create(
-        tx: &mut SqliteConnection,
+    pub async fn create<'e, E: PgExecutor<'e>>(
         password: &str,
         activated_at: Option<i64>,
+        executor: E,
     ) -> Result<Self, AppError> {
-        let pk = sqlx::query("INSERT INTO users (password, activated_at) VALUES ($1, $2);")
-            .bind(password)
-            .bind(activated_at)
-            .execute(tx)
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))
-            .map(|q| q.last_insert_rowid())?;
+        let pk = sqlx::query_scalar(
+            "INSERT INTO users (password, activated_at) VALUES ($1, $2) RETURNING pk;",
+        )
+        .bind(password)
+        .bind(activated_at)
+        .fetch_one(executor)
+        .await
+        .map_err(|e| log_and_wrap_custom_internal!(e))?;
         Ok(Self {
             pk,
             groups: Groups::default(),
         })
     }
 
-    pub async fn create_active_default(tx: &mut SqliteConnection) -> Result<Self, AppError> {
-        Self::create_active(tx, "SDFddg186DFG&$dfg987qzXZCDf688sf4so34$hl#sdfj").await
+    pub async fn create_active_default<'e, E: PgExecutor<'e>>(
+        executor: E,
+    ) -> Result<Self, AppError> {
+        Self::create_active("SDFddg186DFG&$dfg987qzXZCDf688sf4so34$hl#sdfj", executor).await
     }
 
-    pub async fn create_active(
-        tx: &mut SqliteConnection,
+    pub async fn create_active<'e, E: PgExecutor<'e>>(
         password: &str,
+        executor: E,
     ) -> Result<Self, AppError> {
         let activated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
-        Self::create(tx, password, Some(activated_at)).await
+        Self::create(password, Some(activated_at), executor).await
     }
 
-    pub async fn add_to_group(
+    pub async fn add_to_group<'e, E: PgExecutor<'e>>(
         mut self,
         group: Group,
-        tx: &mut SqliteConnection,
+        executor: E,
     ) -> Result<Self, AppError> {
         if self.groups.contains(&group) {
             return Ok(self);
         }
 
-        sqlx::query("INSERT INTO users_groups_m2m (user_pk,  group_pk) VALUES ($1, $2);")
+        sqlx::query("INSERT INTO users_groups_m2m (user_pk, group_pk) VALUES ($1, $2);")
             .bind(self.pk)
             .bind(group as i64)
-            .execute(tx)
+            .execute(executor)
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
@@ -246,7 +255,7 @@ impl User {
         Ok(self)
     }
 
-    pub async fn set_to_active(&self, tx: &mut SqliteConnection) -> Result<i64, AppError> {
+    pub async fn set_to_active<'e, E: PgExecutor<'e>>(&self, executor: E) -> Result<u64, AppError> {
         let activated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -254,15 +263,15 @@ impl User {
         sqlx::query("UPDATE users SET activated_at = $1 WHERE pk = $2;")
             .bind(activated_at)
             .bind(self.pk)
-            .execute(tx)
+            .execute(executor)
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))
-            .map(|q| q.last_insert_rowid())
+            .map(|q| q.rows_affected())
     }
 
     pub async fn find_by_email_with_password(
-        database: &Database,
         email: &str,
+        database: &Database,
     ) -> Result<Option<UserWithPassword>, AppError> {
         sqlx::query_as(
             "SELECT emails.user_pk, GROUP_CONCAT(users_groups_m2m.group_pk, ',') as groups, users.password
@@ -272,7 +281,7 @@ impl User {
                 WHERE emails.email = $1;",
         )
         .bind(email)
-        .fetch_optional(database.get_connection())
+        .fetch_optional(&**database)
         .await
         .map_err(|e| log_and_wrap_custom_internal!(e))
     }
@@ -302,7 +311,7 @@ impl EmailAccount {
             .0
     }
 
-    pub async fn get_by_email(database: &Database, email: &str) -> Result<Option<Self>, AppError> {
+    pub async fn get_by_email(email: &str, database: &Database) -> Result<Option<Self>, AppError> {
         sqlx::query_as(
             "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
                 FROM emails
@@ -310,12 +319,12 @@ impl EmailAccount {
                 WHERE emails.email = $1;",
         )
         .bind(email)
-        .fetch_optional(database.get_connection())
+        .fetch_optional(&**database)
         .await
         .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
-    pub async fn get_by_pk(tx: &mut SqliteConnection, pk: i64) -> Result<Self, AppError> {
+    pub async fn get_by_pk<'e, E: PgExecutor<'e>>(pk: i64, executor: E) -> Result<Self, AppError> {
         sqlx::query_as(
             "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
             FROM emails
@@ -323,60 +332,51 @@ impl EmailAccount {
             WHERE emails.pk = $1;",
         )
         .bind(pk)
-        .fetch_one(tx)
+        .fetch_one(executor)
         .await
         .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
-    pub async fn create_primary_active(
-        tx: &mut SqliteConnection,
+    pub async fn create_primary_active<'e, E: PgExecutor<'e>>(
         user: User,
         email: String,
+        executor: E,
     ) -> Result<Self, AppError> {
         let activated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
             .as_secs() as i64;
 
-        Self::create_primary(tx, user, email, Some(activated_at)).await
+        Self::create_primary(user, email, Some(activated_at), executor).await
     }
 
-    pub async fn create_primary(
-        tx: &mut SqliteConnection,
+    pub async fn create_primary<'e, E: PgExecutor<'e>>(
         user: User,
         email: String,
         activated_at: Option<i64>,
+        executor: E,
     ) -> Result<Self, AppError> {
-        let pk = sqlx::query("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4);")
-            .bind(1)
-            .bind(user.pk)
-            .bind(activated_at)
-            .bind(&email)
-            .execute(tx)
-            .await
-            .map(|q| q.last_insert_rowid())?;
-        Ok(Self { pk, user, email })
+        Self::create(true, user, email, activated_at, executor).await
     }
 
-    pub async fn create(
-        tx: &mut SqliteConnection,
+    pub async fn create<'e, E: PgExecutor<'e>>(
         is_primary: bool,
         user: User,
         email: String,
         activated_at: Option<i64>,
+        executor: E,
     ) -> Result<Self, AppError> {
-        let pk = sqlx::query("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4);")
+        let pk = sqlx::query_scalar("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4) RETURNING pk;")
             .bind(is_primary)
             .bind(user.pk)
             .bind(activated_at)
             .bind(&email)
-            .execute(tx)
-            .await
-            .map(|q| q.last_insert_rowid())?;
+            .fetch_one(executor)
+            .await?;
         Ok(Self { pk, user, email })
     }
 
-    pub async fn set_to_active(self, tx: &mut SqliteConnection) -> Result<Self, AppError> {
+    pub async fn set_to_active<'e, E: PgExecutor<'e>>(self, executor: E) -> Result<Self, AppError> {
         let activated_at = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("Time went backwards")
@@ -384,9 +384,8 @@ impl EmailAccount {
         sqlx::query("UPDATE emails SET activated_at = $1 WHERE pk = $2;")
             .bind(activated_at)
             .bind(self.pk)
-            .execute(tx)
-            .await
-            .map(|q| q.last_insert_rowid())?;
+            .execute(executor)
+            .await?;
         Ok(self)
     }
 }
@@ -402,27 +401,27 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx)
+        let user = User::create_active_default(&mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::Admin, &mut tx)
+            .add_to_group(Group::Admin, &mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::User, &mut tx)
+            .add_to_group(Group::User, &mut *tx)
             .await
             .unwrap();
         let email_account = EmailAccount::create_primary_active(
-            &mut tx,
             user,
             "test_email_account_get_by_email@example.com".into(),
+            &mut *tx,
         )
         .await;
         tx.commit().await.unwrap();
         let account = email_account.unwrap();
 
         let result = EmailAccount::get_by_email(
-            database.database(),
             "test_email_account_get_by_email@example.com",
+            database.database(),
         )
         .await
         .unwrap();
@@ -434,7 +433,7 @@ mod tests {
 
         sqlx::query("DELETE FROM users WHERE pk = $1;")
             .bind(account.user.pk)
-            .execute(database.get_connection())
+            .execute(&**database)
             .await
             .unwrap();
     }
@@ -444,24 +443,24 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx)
+        let user = User::create_active_default(&mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::User, &mut tx)
+            .add_to_group(Group::User, &mut *tx)
             .await
             .unwrap();
         let account = EmailAccount::create_primary_active(
-            &mut tx,
             user,
             "test_find_by_email_with_password@example.com".into(),
+            &mut *tx,
         )
         .await
         .unwrap();
         tx.commit().await.unwrap();
 
         let result = User::find_by_email_with_password(
-            database.database(),
             "test_find_by_email_with_password@example.com",
+            database.database(),
         )
         .await
         .unwrap();
@@ -474,7 +473,7 @@ mod tests {
 
         sqlx::query("DELETE FROM users WHERE pk = $1;")
             .bind(account.user.pk)
-            .execute(database.get_connection())
+            .execute(&**database)
             .await
             .unwrap();
     }
@@ -484,7 +483,7 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx).await;
+        let user = User::create_active_default(&mut *tx).await;
         tx.commit().await.unwrap();
 
         assert!(user.is_ok());
@@ -497,10 +496,10 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx).await;
+        let user = User::create_active_default(&mut *tx).await;
 
         assert!(user.is_ok());
-        let user = user.unwrap().add_to_group(Group::Admin, &mut tx).await;
+        let user = user.unwrap().add_to_group(Group::Admin, &mut *tx).await;
         tx.commit().await.unwrap();
         assert!(user.is_ok());
         let user = user.unwrap();
@@ -513,16 +512,16 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx)
+        let user = User::create_active_default(&mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::Admin, &mut tx)
+            .add_to_group(Group::Admin, &mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::User, &mut tx)
+            .add_to_group(Group::User, &mut *tx)
             .await
             .unwrap()
-            .add_to_group(Group::Admin, &mut tx)
+            .add_to_group(Group::Admin, &mut *tx)
             .await
             .unwrap();
         tx.commit().await.unwrap();
@@ -536,11 +535,11 @@ mod tests {
         let database = TestDatabase::setup().await;
 
         let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut tx).await.unwrap();
+        let user = User::create_active_default(&mut *tx).await.unwrap();
         let email_account = EmailAccount::create_primary_active(
-            &mut tx,
             user,
             "test_create_email_account@example.com".into(),
+            &mut *tx,
         )
         .await;
         tx.commit().await.unwrap();
@@ -552,7 +551,7 @@ mod tests {
         let result: Option<(i64, i64, String)> =
             sqlx::query_as("SELECT pk, user_pk, email FROM emails WHERE pk = $1;")
                 .bind(account.pk)
-                .fetch_optional(database.get_connection())
+                .fetch_optional(&**database)
                 .await
                 .unwrap();
 
@@ -564,7 +563,7 @@ mod tests {
 
         sqlx::query("DELETE FROM users WHERE pk = $1;")
             .bind(account.user.pk)
-            .execute(database.get_connection())
+            .execute(&**database)
             .await
             .unwrap();
     }

@@ -1,5 +1,5 @@
 use lettre::Message;
-use sqlx::SqliteConnection;
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use crate::{
@@ -25,17 +25,15 @@ impl EmailValidationManager {
     }
 
     pub async fn delete_and_get_email_pk(
-        tx: &mut SqliteConnection,
         slug: String,
+        tx: &mut PgConnection,
     ) -> Result<Self, AppError> {
-        let email_pk = sqlx::query_as::<_, (i64,)>(
-            "DELETE FROM email_validations WHERE slug = $1 RETURNING email_pk;",
-        )
-        .bind(&slug)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(|e| log_and_wrap_custom_internal!(e))?
-        .0;
+        let email_pk =
+            sqlx::query_scalar("DELETE FROM email_validations WHERE slug = $1 RETURNING email_pk;")
+                .bind(&slug)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
         Ok(Self { email_pk, slug })
     }
@@ -64,7 +62,7 @@ impl EmailValidationManager {
         sqlx::query("INSERT INTO email_validations (email_pk, slug) VALUES ($1, $2);")
             .bind(self.email_pk)
             .bind(&self.slug)
-            .execute(database.get_connection())
+            .execute(&**database)
             .await
             .map_err(|e| log_and_wrap_custom_internal!(e))?;
         //TODO: check that the slug is unique

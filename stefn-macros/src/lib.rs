@@ -47,83 +47,23 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
     impl #struct_name {
         pub fn insert_query()->String{
             format!(
-                "INSERT INTO {} ({}) VALUES ({})",
+                "INSERT INTO {} ({}) VALUES ({}) RETURNING pk;",
                 #table_name,
                 #field_names_str,
                 #dolars
             )
         }
 
-        pub async fn save<'e, E>(&self, executor: E) -> Result<i64, stefn::service::AppError>
-        where
-            E: sqlx::Executor<'e, Database = sqlx::Sqlite>,
+        pub async fn save<'e,  E:  ::sqlx::PgExecutor<'e>>(&self, executor: E) -> Result<i64, ::stefn::service::AppError>
         {
-            sqlx::query(&Self::insert_query())
+            sqlx::query_scalar(&Self::insert_query())
                 #(.bind(&self.#field_names))*
-                .execute(executor)
-                .await
-                .map_err(stefn::service::AppError::from)
-                .map(|q| q.last_insert_rowid())
+                .fetch_one(executor)
+                .await.map_err(::stefn::service::AppError::from)
         }
             }
         };
 
-    TokenStream::from(expanded)
-}
-
-#[proc_macro_derive(CsrfProtected)]
-pub fn add_csrf_token_derive(input: TokenStream) -> TokenStream {
-    //TODO: make it work
-    let input = parse_macro_input!(input as DeriveInput);
-
-    // Extract the struct's identifier (name)
-    let struct_name = input.ident;
-
-    // Extract fields from the struct
-    let fields = if let Data::Struct(data_struct) = &input.data {
-        match &data_struct.fields {
-            Fields::Named(fields_named) => &fields_named.named,
-            _ => panic!("AddCsrfToken can only be used with named structs"),
-        }
-    } else {
-        panic!("AddCsrfToken can only be used with structs");
-    };
-
-    // Generate the expanded fields: existing fields + csrf_token
-    let mut expanded_fields = quote! {};
-    for field in fields {
-        let field_name = &field.ident;
-        let field_type = &field.ty;
-        expanded_fields = quote! {
-            #expanded_fields
-            #field_name: #field_type,
-        };
-    }
-
-    // Add the csrf_token field
-    expanded_fields = quote! {
-        #expanded_fields
-        pub csrf_token: String,
-    };
-
-    // Generate the implementation
-    let expanded = quote! {
-        #[derive(Debug)]
-        pub struct #struct_name {
-            #expanded_fields
-        }
-
-        // impl #struct_name {
-        //     pub fn new_with_csrf(csrf_token: String) -> Self {
-        //         Self {
-        //             csrf_token,
-        //             ..Default::default()
-        //         }
-        //     }
-        // }
-    };
-
-    // Return the generated code
     TokenStream::from(expanded)
 }
 
@@ -155,17 +95,17 @@ fn to_html_form_derive<S: FormStyle>(input: TokenStream) -> TokenStream {
     let button_value = S::button_form_value();
 
     let expanded = quote! {
-        impl stefn::website::html::ToForm for #struct_name {
-            fn form_button<'a>() -> stefn::website::html::HtmlTag<'a> {
-                stefn::website::html::HtmlTag::ParentTag(stefn::website::html::GeneralParentTag::submit_button(#button_value.into(), #button_class.into()))
+        impl ::stefn::website::html::ToForm for #struct_name {
+            fn form_button<'a>() -> ::stefn::website::html::HtmlTag<'a> {
+                ::stefn::website::html::HtmlTag::ParentTag(::stefn::website::html::GeneralParentTag::submit_button(#button_value.into(), #button_class.into()))
             }
 
-            fn raw_form<'a>(&self) -> stefn::website::html::FormTag<'a> {
-                stefn::website::html::FormTag::new(vec![#(#full_fields),*])
+            fn raw_form<'a>(&self) -> ::stefn::website::html::FormTag<'a> {
+                ::stefn::website::html::FormTag::new(vec![#(#full_fields),*])
             }
 
-            fn raw_empty_form<'a>() -> stefn::website::html::FormTag<'a> {
-                stefn::website::html::FormTag::new(vec![#(#empty_fields),*])
+            fn raw_empty_form<'a>() -> ::stefn::website::html::FormTag<'a> {
+                ::stefn::website::html::FormTag::new(vec![#(#empty_fields),*])
             }
         }
     };
@@ -267,7 +207,7 @@ impl FormFieldAttributes {
 
     fn resolve_type(&self) -> proc_macro2::TokenStream {
         self.type_.as_ref().map_or_else(
-            || quote! { stefn::website::html::InputType::Text },
+            || quote! { ::stefn::website::html::InputType::Text },
             |t| {
                 let type_str = t.value();
                 quote! { std::str::FromStr::from_str(#type_str).unwrap() }
@@ -348,17 +288,17 @@ impl FormFieldAttributes {
         let label_class = self.resolve_label_class::<S>();
 
         quote! {
-            stefn::website::html::HtmlTag::ParentTag(stefn::website::html::GeneralParentTag::new(
-                stefn::website::html::ParentTag::Div,
-                stefn::website::html::BasicAttributes::new(#div_id, #div_class, #style),
+            ::stefn::website::html::HtmlTag::ParentTag(::stefn::website::html::GeneralParentTag::new(
+                ::stefn::website::html::ParentTag::Div,
+                ::stefn::website::html::BasicAttributes::new(#div_id, #div_class, #style),
                 vec![
-                    stefn::website::html::HtmlTag::ChildTag(stefn::website::html::GeneralChildTag::new(
-                        Some(stefn::website::html::ChildTag::Label),
-                        stefn::website::html::BasicAttributes::new(#label_id, #label_class, #style),
+                    ::stefn::website::html::HtmlTag::ChildTag(::stefn::website::html::GeneralChildTag::new(
+                        Some(::stefn::website::html::ChildTag::Label),
+                        ::stefn::website::html::BasicAttributes::new(#label_id, #label_class, #style),
                         #name,
                     )),
-                    stefn::website::html::HtmlTag::Input(stefn::website::html::InputTag::new(
-                        stefn::website::html::BasicAttributes::new(#input_id, #input_class, #style),
+                    ::stefn::website::html::HtmlTag::Input(::stefn::website::html::InputTag::new(
+                        ::stefn::website::html::BasicAttributes::new(#input_id, #input_class, #style),
                         #name,
                         #type_,
                         #value,

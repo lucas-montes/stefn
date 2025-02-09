@@ -37,8 +37,8 @@ struct IngressFormCaptchaTest {
 
 #[derive(Debug, Deserialize, Validate)]
 struct IngressFormTest {
-    email: String,
-    password: String,
+    _email: String,
+    _password: String,
 }
 
 async fn form_with_csrf_and_captcha(

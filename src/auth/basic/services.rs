@@ -47,19 +47,19 @@ pub struct IngressParams {
 }
 
 pub trait Ingress {
-    async fn route(
+    fn route(
         state: State<WebsiteState>,
         Extension(session): Extension<Session>,
         params: Query<IngressParams>,
         input: SecureForm<IngressForm>,
-    ) -> Result<Redirect, AppError> {
+    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {async move{
         let input = input.data();
         match input.process {
             IngressProcess::Login => Self::login(&state, session, &params, input).await,
             IngressProcess::Register => Self::register(&state, session, &params, input).await,
         }
         .map(Redirect::to)
-    }
+    } }
 
     fn login<'a>(
         state: &'a WebsiteState,
@@ -198,21 +198,21 @@ pub trait Ingress {
 }
 
 pub trait EmailValidation {
-    async fn route(
+    fn route(
         state: State<WebsiteState>,
         Extension(session): Extension<Session>,
         Path(slug): Path<String>,
-    ) -> Result<Redirect, AppError> {
+    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {async move{
         Self::validate_email(&state, session, slug)
             .await
-            .map(Redirect::to)
-    }
+            .map(|r|Redirect::to(r.as_str()))
+    } }
 
-    async fn validate_email<'a>(
-        state: &'a WebsiteState,
+    fn validate_email(
+        state: &WebsiteState,
         session: Session,
         slug: String,
-    ) -> Result<&'a str, AppError> {
+    ) -> impl std::future::Future<Output = Result<&String, AppError>> + Send {async {
         let database = state.database();
         let config = state.config();
         let mut tx = database.start_transaction().await?;
@@ -224,9 +224,9 @@ pub trait EmailValidation {
 
         Self::handle_session(state.sessions(), session, config, user).await?;
         Ok(&config.login_redirect_to)
-    }
+    } }
 
-    fn activate_user<'a>(
+    fn activate_user(
         validation: EmailValidationManager,
         tx: &mut PgConnection,
     ) -> impl std::future::Future<Output = Result<EmailAccount, AppError>> + Send {
@@ -240,10 +240,10 @@ pub trait EmailValidation {
         }
     }
 
-    fn handle_session<'a>(
-        sessions: &'a Sessions,
+    fn handle_session(
+        sessions: &Sessions,
         session: Session,
-        config: &'a WebsiteConfig,
+        config: &WebsiteConfig,
         user: EmailAccount,
     ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
         async move {

@@ -41,29 +41,9 @@ impl Database {
     }
 }
 
-pub struct TestDatabase(Database);
-
-impl Deref for TestDatabase {
-    type Target = Database;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl TestDatabase {
-    pub async fn setup() -> Self {
-        let database = Database::new("test-database");
-        database.run_migrations().await;
-        Self(database)
-    }
-
-    pub fn database(&self) -> &Database {
-        &self.0
-    }
-
-    pub async fn start_transaction(&self) -> Result<Transaction<'_, Postgres>, AppError> {
-        self.0.start_transaction().await
+impl From<PgPool> for Database {
+    fn from(db: PgPool) -> Self {
+        Database(db)
     }
 }
 

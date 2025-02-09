@@ -39,17 +39,17 @@ fn test_insertable() {
     #[derive(Insertable)]
     #[table_name = "users"]
     struct UserCreate {
-        email: String,
-        id: Option<i64>,
+        _email: String,
+        _id: Option<i64>,
     }
 
-    let user = UserCreate {
-        email: "test@example.com".into(),
-        id: None,
+    UserCreate {
+        _email: "test@example.com".into(),
+        _id: None,
     };
 
     assert_eq!(
         UserCreate::insert_query().to_string(),
-        "INSERT INTO \"users\" (email,id) VALUES ($1,$2)"
+        "INSERT INTO \"users\" (_email,_id) VALUES ($1,$2)"
     );
 }

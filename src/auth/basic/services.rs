@@ -1,5 +1,3 @@
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
@@ -63,122 +61,131 @@ pub trait Ingress {
         .map(Redirect::to)
     }
 
-    async fn login<'a>(
+    fn login<'a>(
         state: &'a WebsiteState,
         session: Session,
         params: &'a IngressParams,
         input: IngressForm,
-    ) -> Result<&'a str, AppError> {
-        let config = state.config();
+    ) -> impl std::future::Future<Output = Result<&'a str, AppError>> + Send {
+        async move {
+            let config = state.config();
 
-        let user = Self::validate_login(state, &input).await?;
+            let user = Self::validate_login(state, &input).await?;
 
-        Self::handle_login_session(state.sessions(), session, config, user).await?;
+            Self::handle_login_session(state.sessions(), session, config, user).await?;
 
-        Ok(Self::get_login_redirect(config, params))
+            Ok(Self::get_login_redirect(config, params))
+        }
     }
 
-    async fn validate_login<'a>(
+    fn validate_login<'a>(
         state: &'a WebsiteState,
         input: &'a IngressForm,
-    ) -> Result<UserWithPassword, AppError> {
-        User::find_by_email_with_password(&input.email, state.database())
-            .await?
-            .ok_or(AppError::DoesNotExist)
-            .and_then(|u| verify_password(&input.password, &u.password).map(|_| u))
+    ) -> impl std::future::Future<Output = Result<UserWithPassword, AppError>> + Send {
+        async {
+            User::find_by_email_with_password(&input.email, state.database())
+                .await?
+                .ok_or(AppError::DoesNotExist)
+                .and_then(|u| verify_password(&input.password, &u.password).map(|_| u))
+        }
     }
 
-    async fn handle_login_session<'a>(
+    fn handle_login_session<'a>(
         sessions: &'a Sessions,
         session: Session,
         config: &'a WebsiteConfig,
         user: UserWithPassword,
-    ) -> Result<(), AppError> {
-        sessions
-            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
-            .await
+    ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
+        async move {
+            sessions
+                .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
+                .await
+        }
     }
 
     fn get_login_redirect<'a>(config: &'a WebsiteConfig, params: &'a IngressParams) -> &'a str {
         params.next.as_ref().unwrap_or(&config.login_redirect_to)
     }
 
-    async fn register<'a>(
+    fn register<'a>(
         state: &'a WebsiteState,
         session: Session,
         params: &'a IngressParams,
         input: IngressForm,
-    ) -> Result<&'a str, AppError> {
-        let config = state.config();
-        let database = state.database();
+    ) -> impl std::future::Future<Output = Result<&'a str, AppError>> + Send {
+        async {
+            let config = state.config();
+            let database = state.database();
 
-        let user = Self::create_user(database, input, config).await?;
+            let user = Self::create_user(database, input, config).await?;
 
-        if config.email_validation {
-            Self::handle_email_validation(state, &user).await?;
-        } else {
-            Self::handle_register_session(state.sessions(), session, config, user).await?;
-        };
+            if config.email_validation {
+                Self::handle_email_validation(state, &user).await?;
+            } else {
+                Self::handle_register_session(state.sessions(), session, config, user).await?;
+            };
 
-        Ok(Self::get_register_redirect(config, params))
+            Ok(Self::get_register_redirect(config, params))
+        }
     }
 
-    async fn create_user<'a>(
+    fn create_user<'a>(
         database: &'a Database,
         input: IngressForm,
         config: &'a WebsiteConfig,
-    ) -> Result<EmailAccount, AppError> {
-        let mut tx = database.start_transaction().await?;
+    ) -> impl std::future::Future<Output = Result<EmailAccount, AppError>> + Send {
+        async move {
+            let mut tx = database.start_transaction().await?;
 
-        let password = hash_password(&input.password)?;
+            let password = hash_password(&input.password)?;
 
-        let activated_at = if config.email_validation {
-            None
-        } else {
-            Some(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("Time went backwards")
-                    .as_secs() as i64,
-            )
-        };
+            let activated_at = if config.email_validation {
+                None
+            } else {
+                Some(chrono::Utc::now().naive_utc())
+            };
 
-        let user = User::create(&password, activated_at, &mut *tx)
-            .await?
-            .add_to_group(Group::User, &mut *tx)
-            .await?;
+            let user = User::create(&password, activated_at, &mut *tx)
+                .await?
+                .add_to_group(Group::User, &mut *tx)
+                .await?;
 
-        let email_account =
-            EmailAccount::create_primary(user, input.email, activated_at, &mut *tx).await?;
+            let email_account =
+                EmailAccount::create_primary(user, input.email, activated_at, &mut *tx).await?;
 
-        tx.commit().await?;
-        Ok(email_account)
+            tx.commit().await?;
+            Ok(email_account)
+        }
     }
 
-    async fn handle_email_validation<'a>(
+    fn handle_email_validation<'a>(
         state: &'a WebsiteState,
         user: &'a EmailAccount,
-    ) -> Result<(), AppError> {
-        let config = state.config();
-        let database = state.database();
-        let mailer = state.mailer();
-        EmailValidationManager::new(user.pk)
-            .save(database)
-            .await?
-            .send(config, mailer, &user.email)
-            .await?;
-        Ok(())
+    ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
+        async {
+            let config = state.config();
+            let database = state.database();
+            let mailer = state.mailer();
+            EmailValidationManager::new(user.pk)
+                .save(database)
+                .await?
+                .send(config, mailer, &user.email)
+                .await?;
+            Ok(())
+        }
     }
 
-    async fn handle_register_session<'a>(
+    fn handle_register_session<'a>(
         sessions: &'a Sessions,
         session: Session,
         config: &'a WebsiteConfig,
         user: EmailAccount,
-    ) -> Result<(), AppError> {
-        sessions
-            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
-            .await
+    ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
+        async move {
+            sessions
+                .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
+                .await
+        }
     }
 
     fn get_register_redirect<'a>(config: &'a WebsiteConfig, _params: &'a IngressParams) -> &'a str {
@@ -219,27 +226,31 @@ pub trait EmailValidation {
         Ok(&config.login_redirect_to)
     }
 
-    async fn activate_user<'a>(
+    fn activate_user<'a>(
         validation: EmailValidationManager,
         tx: &mut PgConnection,
-    ) -> Result<EmailAccount, AppError> {
-        let email = EmailAccount::get_by_pk(validation.email_pk, &mut *tx)
-            .await?
-            .set_to_active(&mut *tx)
-            .await?;
-        email.user.set_to_active(&mut *tx).await?;
-        Ok(email)
+    ) -> impl std::future::Future<Output = Result<EmailAccount, AppError>> + Send {
+        async move {
+            let email = EmailAccount::get_by_pk(validation.email_pk, &mut *tx)
+                .await?
+                .set_to_active(&mut *tx)
+                .await?;
+            email.user.set_to_active(&mut *tx).await?;
+            Ok(email)
+        }
     }
 
-    async fn handle_session<'a>(
+    fn handle_session<'a>(
         sessions: &'a Sessions,
         session: Session,
         config: &'a WebsiteConfig,
         user: EmailAccount,
-    ) -> Result<(), AppError> {
-        sessions
-            .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
-            .await
+    ) -> impl std::future::Future<Output = Result<(), AppError>> + Send {
+        async move {
+            sessions
+                .reuse_current_as_new_one(&session, user.user.for_session(), &config.session_key)
+                .await
+        }
     }
 }
 

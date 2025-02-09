@@ -5,6 +5,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgRow, prelude::FromRow, sqlite::SqliteRow, Decode, PgExecutor, Row, Type};
 
@@ -201,7 +202,7 @@ impl User {
 
     pub async fn create<'e, E: PgExecutor<'e>>(
         password: &str,
-        activated_at: Option<i64>,
+        activated_at: Option<NaiveDateTime>,
         executor: E,
     ) -> Result<Self, AppError> {
         let pk = sqlx::query_scalar(
@@ -228,10 +229,7 @@ impl User {
         password: &str,
         executor: E,
     ) -> Result<Self, AppError> {
-        let activated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
+        let activated_at = chrono::Utc::now().naive_utc();
         Self::create(password, Some(activated_at), executor).await
     }
 
@@ -274,7 +272,7 @@ impl User {
         database: &Database,
     ) -> Result<Option<UserWithPassword>, AppError> {
         sqlx::query_as(
-            "SELECT emails.user_pk, GROUP_CONCAT(users_groups_m2m.group_pk, ',') as groups, users.password
+            "SELECT emails.user_pk, STRING_AGG(users_groups_m2m.group_pk::TEXT, ',') as groups, users.password
                 FROM emails
                 INNER JOIN users ON users.pk = emails.user_pk
                 LEFT JOIN users_groups_m2m ON emails.user_pk = users_groups_m2m.user_pk
@@ -326,7 +324,7 @@ impl EmailAccount {
 
     pub async fn get_by_pk<'e, E: PgExecutor<'e>>(pk: i64, executor: E) -> Result<Self, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(group_pk::TEXT, ',') as groups 
             FROM emails
             LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
             WHERE emails.pk = $1;",
@@ -342,10 +340,7 @@ impl EmailAccount {
         email: String,
         executor: E,
     ) -> Result<Self, AppError> {
-        let activated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
+        let activated_at = chrono::Utc::now().naive_utc();
 
         Self::create_primary(user, email, Some(activated_at), executor).await
     }
@@ -353,7 +348,7 @@ impl EmailAccount {
     pub async fn create_primary<'e, E: PgExecutor<'e>>(
         user: User,
         email: String,
-        activated_at: Option<i64>,
+        activated_at: Option<NaiveDateTime>,
         executor: E,
     ) -> Result<Self, AppError> {
         Self::create(true, user, email, activated_at, executor).await
@@ -363,7 +358,7 @@ impl EmailAccount {
         is_primary: bool,
         user: User,
         email: String,
-        activated_at: Option<i64>,
+        activated_at: Option<NaiveDateTime>,
         executor: E,
     ) -> Result<Self, AppError> {
         let pk = sqlx::query_scalar("INSERT INTO emails (is_primary, user_pk, activated_at, email) VALUES ($1, $2, $3, $4) RETURNING pk;")
@@ -377,10 +372,8 @@ impl EmailAccount {
     }
 
     pub async fn set_to_active<'e, E: PgExecutor<'e>>(self, executor: E) -> Result<Self, AppError> {
-        let activated_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_secs() as i64;
+        let activated_at = chrono::Utc::now().naive_utc();
+
         sqlx::query("UPDATE emails SET activated_at = $1 WHERE pk = $2;")
             .bind(activated_at)
             .bind(self.pk)
@@ -392,13 +385,15 @@ impl EmailAccount {
 
 #[cfg(test)]
 mod tests {
-    use crate::database::TestDatabase;
+    use sqlx::PgPool;
+
+    use crate::database::Database;
 
     use super::*;
 
-    #[tokio::test]
-    async fn test_email_account_get_by_email() {
-        let database = TestDatabase::setup().await;
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_email_account_get_by_email(pool: PgPool) {
+        let database: Database = pool.into();
 
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx)
@@ -410,38 +405,29 @@ mod tests {
             .add_to_group(Group::User, &mut *tx)
             .await
             .unwrap();
-        let email_account = EmailAccount::create_primary_active(
+        EmailAccount::create_primary_active(
             user,
             "test_email_account_get_by_email@example.com".into(),
             &mut *tx,
         )
-        .await;
-        tx.commit().await.unwrap();
-        let account = email_account.unwrap();
-
-        let result = EmailAccount::get_by_email(
-            "test_email_account_get_by_email@example.com",
-            database.database(),
-        )
         .await
         .unwrap();
+        tx.commit().await.unwrap();
+
+        let result =
+            EmailAccount::get_by_email("test_email_account_get_by_email@example.com", &database)
+                .await
+                .unwrap();
 
         assert!(result.is_some());
         let result = result.unwrap();
 
         assert_eq!(result.user.groups.0, vec![Group::Admin, Group::User]);
-
-        sqlx::query("DELETE FROM users WHERE pk = $1;")
-            .bind(account.user.pk)
-            .execute(&**database)
-            .await
-            .unwrap();
     }
 
-    #[tokio::test]
-    async fn test_find_by_email_with_password() {
-        let database = TestDatabase::setup().await;
-
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_find_by_email_with_password(pool: PgPool) {
+        let database: Database = pool.into();
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx)
             .await
@@ -449,7 +435,7 @@ mod tests {
             .add_to_group(Group::User, &mut *tx)
             .await
             .unwrap();
-        let account = EmailAccount::create_primary_active(
+        EmailAccount::create_primary_active(
             user,
             "test_find_by_email_with_password@example.com".into(),
             &mut *tx,
@@ -460,7 +446,7 @@ mod tests {
 
         let result = User::find_by_email_with_password(
             "test_find_by_email_with_password@example.com",
-            database.database(),
+            &database,
         )
         .await
         .unwrap();
@@ -470,17 +456,11 @@ mod tests {
 
         assert_eq!(result.password, "SDFdso34$hl#sdfj");
         assert_eq!(result.user.groups.0, vec![Group::User]);
-
-        sqlx::query("DELETE FROM users WHERE pk = $1;")
-            .bind(account.user.pk)
-            .execute(&**database)
-            .await
-            .unwrap();
     }
 
-    #[tokio::test]
-    async fn test_create_active_default() {
-        let database = TestDatabase::setup().await;
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_create_active_default(pool: PgPool) {
+        let database: Database = pool.into();
 
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx).await;
@@ -491,9 +471,9 @@ mod tests {
         assert!(user_pk > 0);
     }
 
-    #[tokio::test]
-    async fn test_create_admin_user() {
-        let database = TestDatabase::setup().await;
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_create_admin_user(pool: PgPool) {
+        let database: Database = pool.into();
 
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx).await;
@@ -507,9 +487,9 @@ mod tests {
         assert_eq!(user.groups.0, vec![Group::Admin]);
     }
 
-    #[tokio::test]
-    async fn test_create_user_multiple_groups() {
-        let database = TestDatabase::setup().await;
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_create_user_multiple_groups(pool: PgPool) {
+        let database: Database = pool.into();
 
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx)
@@ -530,9 +510,9 @@ mod tests {
         assert_eq!(user.groups.0, vec![Group::Admin, Group::User]);
     }
 
-    #[tokio::test]
-    async fn test_create_email_account() {
-        let database = TestDatabase::setup().await;
+    #[sqlx::test(migrations = "./migrations/principal")]
+    async fn test_create_email_account(pool: PgPool) {
+        let database: Database = pool.into();
 
         let mut tx = database.start_transaction().await.unwrap();
         let user = User::create_active_default(&mut *tx).await.unwrap();
@@ -551,7 +531,7 @@ mod tests {
         let result: Option<(i64, i64, String)> =
             sqlx::query_as("SELECT pk, user_pk, email FROM emails WHERE pk = $1;")
                 .bind(account.pk)
-                .fetch_optional(&**database)
+                .fetch_optional(&*database)
                 .await
                 .unwrap();
 
@@ -560,11 +540,5 @@ mod tests {
         assert_eq!(db_pk, account.pk);
         assert_eq!(db_user_pk, account.user.pk);
         assert_eq!(db_email, "test_create_email_account@example.com");
-
-        sqlx::query("DELETE FROM users WHERE pk = $1;")
-            .bind(account.user.pk)
-            .execute(&**database)
-            .await
-            .unwrap();
     }
 }

@@ -1,3 +1,3 @@
 mod service;
 
-pub use service::{Database, IpsDatabase, TestDatabase};
+pub use service::{Database, IpsDatabase};

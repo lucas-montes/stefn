@@ -190,14 +190,13 @@ impl User {
     }
 
     pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
-        let exists: i64 = sqlx::query_scalar(
+        sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL);",
         )
         .bind(self.pk)
         .fetch_one(&**database)
-        .await?;
-
-        Ok(exists == 1)
+        .await
+        .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
     pub async fn create<'e, E: PgExecutor<'e>>(

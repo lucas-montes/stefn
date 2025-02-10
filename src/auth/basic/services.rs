@@ -52,14 +52,16 @@ pub trait Ingress {
         Extension(session): Extension<Session>,
         params: Query<IngressParams>,
         input: SecureForm<IngressForm>,
-    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {async move{
-        let input = input.data();
-        match input.process {
-            IngressProcess::Login => Self::login(&state, session, &params, input).await,
-            IngressProcess::Register => Self::register(&state, session, &params, input).await,
+    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {
+        async move {
+            let input = input.data();
+            match input.process {
+                IngressProcess::Login => Self::login(&state, session, &params, input).await,
+                IngressProcess::Register => Self::register(&state, session, &params, input).await,
+            }
+            .map(Redirect::to)
         }
-        .map(Redirect::to)
-    } }
+    }
 
     fn login<'a>(
         state: &'a WebsiteState,
@@ -202,29 +204,33 @@ pub trait EmailValidation {
         state: State<WebsiteState>,
         Extension(session): Extension<Session>,
         Path(slug): Path<String>,
-    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {async move{
-        Self::validate_email(&state, session, slug)
-            .await
-            .map(|r|Redirect::to(r.as_str()))
-    } }
+    ) -> impl std::future::Future<Output = Result<Redirect, AppError>> + Send {
+        async move {
+            Self::validate_email(&state, session, slug)
+                .await
+                .map(|r| Redirect::to(r.as_str()))
+        }
+    }
 
     fn validate_email(
         state: &WebsiteState,
         session: Session,
         slug: String,
-    ) -> impl std::future::Future<Output = Result<&String, AppError>> + Send {async {
-        let database = state.database();
-        let config = state.config();
-        let mut tx = database.start_transaction().await?;
-        let validation = EmailValidationManager::delete_and_get_email_pk(slug, &mut tx).await?;
-        let user = Self::activate_user(validation, &mut tx).await?;
-        tx.commit()
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+    ) -> impl std::future::Future<Output = Result<&String, AppError>> + Send {
+        async {
+            let database = state.database();
+            let config = state.config();
+            let mut tx = database.start_transaction().await?;
+            let validation = EmailValidationManager::delete_and_get_email_pk(slug, &mut tx).await?;
+            let user = Self::activate_user(validation, &mut tx).await?;
+            tx.commit()
+                .await
+                .map_err(|e| log_and_wrap_custom_internal!(e))?;
 
-        Self::handle_session(state.sessions(), session, config, user).await?;
-        Ok(&config.login_redirect_to)
-    } }
+            Self::handle_session(state.sessions(), session, config, user).await?;
+            Ok(&config.login_redirect_to)
+        }
+    }
 
     fn activate_user(
         validation: EmailValidationManager,

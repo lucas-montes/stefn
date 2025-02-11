@@ -59,7 +59,8 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
             sqlx::query_scalar(&Self::insert_query())
                 #(.bind(&self.#field_names))*
                 .fetch_one(executor)
-                .await.map_err(::stefn::service::AppError::from)
+                .await
+                .map_err(::stefn::service::AppError::from)
         }
             }
         };

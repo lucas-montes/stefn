@@ -310,7 +310,7 @@ impl EmailAccount {
 
     pub async fn get_by_email(email: &str, database: &Database) -> Result<Option<Self>, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(group_pk::TEXT, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(users_groups_m2m.group_pk::TEXT, ',') as groups 
                 FROM emails
                 LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
                 WHERE emails.email = $1;",
@@ -323,7 +323,7 @@ impl EmailAccount {
 
     pub async fn get_by_pk<'e, E: PgExecutor<'e>>(pk: i64, executor: E) -> Result<Self, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(group_pk::TEXT, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(users_groups_m2m.group_pk::TEXT, ',') as groups 
             FROM emails
             LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
             WHERE emails.pk = $1;",

@@ -1,0 +1,88 @@
+name: Lint & Test
+
+on:
+  workflow_dispatch:
+  push:
+
+env: 
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-and-lint:
+    name: Test and lint
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      
+      - name: Cache Cargo Registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: cargo-cache-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-cache-${{ runner.os }}-
+
+      - name: Cache Cargo Build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: cargo-build-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-build-${{ runner.os }}-
+      
+      - name: Rust fmt
+        run: cargo fmt --all -- --check
+
+      - name: Rust clippy
+        run: cargo clippy -- -Dclippy::all -Dclippy::pedantic -D warnings
+      
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h localhost -p 5432 -U postgres; then
+              echo "PostgreSQL is ready!"
+              exit 0
+            fi
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready in time"
+          exit 1
+
+      - name: Run migrations
+        run: |
+          sqlx database create
+	        sqlx migrate run --source migrations/principal
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/test_db
+
+      - name: Rust test
+        run: cargo test --all
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/test_db
+      

@@ -310,7 +310,7 @@ impl EmailAccount {
 
     pub async fn get_by_email(email: &str, database: &Database) -> Result<Option<Self>, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, GROUP_CONCAT(group_pk, ',') as groups 
+            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(group_pk::TEXT, ',') as groups 
                 FROM emails
                 LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
                 WHERE emails.email = $1;",

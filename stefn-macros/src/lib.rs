@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, LitStr, Meta};
 
+/// Panics
 #[proc_macro_derive(Insertable, attributes(table_name))]
 pub fn add_insertable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -35,11 +36,11 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
         .collect();
     let field_names_str = field_names
         .iter()
-        .map(|ident| ident.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<Vec<String>>()
         .join(",");
     let dolars = (1..=field_names.len())
-        .map(|s| format!("${}", s))
+        .map(|s| format!("${s}"))
         .collect::<Vec<String>>()
         .join(",");
 
@@ -129,8 +130,8 @@ fn process_field<S: FormStyle>(
         .to_form_input::<S>(field_name, include_value)
 }
 
-fn get_default_stream(tag_attribute: &Option<LitStr>) -> proc_macro2::TokenStream {
-    tag_attribute.as_ref().map_or(
+fn get_default_stream(tag_attribute: Option<&LitStr>) -> proc_macro2::TokenStream {
+    tag_attribute.map_or(
         quote! { std::borrow::Cow::default() },
         |c| quote! { #c.into() },
     )
@@ -178,7 +179,7 @@ impl FormFieldAttributes {
         let mut attrs = FormFieldAttributes::default();
 
         attr.parse_nested_meta(|meta| {
-            let key = meta.path.get_ident().map(|id| id.to_string());
+            let key = meta.path.get_ident().map(std::string::ToString::to_string);
             let value: LitStr = meta.value()?.parse()?;
 
             match key.as_deref() {
@@ -194,14 +195,14 @@ impl FormFieldAttributes {
                 Some(v) => {
                     return Err(syn::Error::new(
                         meta.path.span(),
-                        format!("Unknown attribute {}", v),
+                        format!("Unknown attribute {v}"),
                     ))
                 }
                 None => {}
             }
             Ok(())
         })
-        .unwrap_or_else(|err| panic!("Error parsing attributes : {}", err));
+        .unwrap_or_else(|err| panic!("Error parsing attributes : {err}"));
 
         attrs
     }
@@ -235,7 +236,7 @@ impl FormFieldAttributes {
         let mut unique_id = self
             .id
             .as_ref()
-            .map_or(field_name.to_string(), |i| i.value());
+            .map_or(field_name.to_string(), syn::LitStr::value);
         unique_id.push('-');
         unique_id.push_str(tag);
         quote! { #unique_id.into() }
@@ -274,10 +275,10 @@ impl FormFieldAttributes {
         let input_id = self.generate_id(field_name, "input");
         let label_id = self.generate_id(field_name, "label");
 
-        let style = get_default_stream(&self.style);
+        let style = get_default_stream(self.style.as_ref());
         let type_ = self.resolve_type();
         let name = self.resolve_name(field_name);
-        let placeholder = get_default_stream(&self.placeholder);
+        let placeholder = get_default_stream(self.placeholder.as_ref());
         let value = FormFieldAttributes::resolve_value(field_name, include_value);
 
         let div_class = self.resolve_div_class::<S>();

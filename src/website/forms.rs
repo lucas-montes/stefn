@@ -90,7 +90,7 @@ where
         let http_client = HttpClient::from_ref(_state);
 
         let form = CloudflareCaptchaParams {
-            secret: &config.captcha_secrect_key,
+            secret: &config.captcha_secret_key,
             response: &payload.cf_turnstile_response,
             remoteip: cf_ip,
             idempotency_key: None,

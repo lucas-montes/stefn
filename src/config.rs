@@ -76,7 +76,7 @@ pub struct WebsiteConfig {
     google_scopes: String,
     // Note: currently cloudflare reCaptcha
     pub captcha_public_key: String,
-    pub captcha_secrect_key: String,
+    pub captcha_secret_key: String,
 
     pub email_validation: bool,
     pub email_validation_redirect: String,
@@ -119,7 +119,7 @@ impl ServiceConfig for WebsiteConfig {
             google_client_secret: "".into(),
             google_scopes: "scope1,scope2".into(),
             captcha_public_key: "1x00000000000000000000AA".into(),
-            captcha_secrect_key: "1x0000000000000000000000000000000AA".into(),
+            captcha_secret_key: "1x0000000000000000000000000000000AA".into(),
             email_validation: false,
             email_validation_redirect: "email_validation_redirect".into(),
             email_default_sender: "email_default_sender@example.com".to_owned(),

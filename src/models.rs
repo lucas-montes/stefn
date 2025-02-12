@@ -308,25 +308,14 @@ impl EmailAccount {
             .0
     }
 
-    pub async fn get_by_email(email: &str, database: &Database) -> Result<Option<Self>, AppError> {
-        sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(users_groups_m2m.group_pk::TEXT, ',') as groups 
-                FROM emails
-                LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
-                WHERE emails.email = $1;",
-        )
-        .bind(email)
-        .fetch_optional(&**database)
-        .await
-        .map_err(|e| log_and_wrap_custom_internal!(e))
-    }
-
     pub async fn get_by_pk<'e, E: PgExecutor<'e>>(pk: i64, executor: E) -> Result<Self, AppError> {
         sqlx::query_as(
-            "SELECT emails.pk, emails.user_pk, emails.email, STRING_AGG(users_groups_m2m.group_pk::TEXT, ',') as groups 
+            "
+            SELECT emails.pk, emails.user_pk, emails.email, COALESCE(STRING_AGG(users_groups_m2m.group_pk::TEXT, ','), '') AS groups 
             FROM emails
             LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
-            WHERE emails.pk = $1;",
+            WHERE emails.pk = $1
+            GROUP BY emails.pk, emails.user_pk, emails.email;",
         )
         .bind(pk)
         .fetch_one(executor)
@@ -389,40 +378,6 @@ mod tests {
     use crate::database::Database;
 
     use super::*;
-
-    #[sqlx::test(migrations = "./migrations/principal")]
-    async fn test_email_account_get_by_email(pool: PgPool) {
-        let database: Database = pool.into();
-
-        let mut tx = database.start_transaction().await.unwrap();
-        let user = User::create_active_default(&mut *tx)
-            .await
-            .unwrap()
-            .add_to_group(Group::Admin, &mut *tx)
-            .await
-            .unwrap()
-            .add_to_group(Group::User, &mut *tx)
-            .await
-            .unwrap();
-        EmailAccount::create_primary_active(
-            user,
-            "test_email_account_get_by_email@example.com".into(),
-            &mut *tx,
-        )
-        .await
-        .unwrap();
-        tx.commit().await.unwrap();
-
-        let result =
-            EmailAccount::get_by_email("test_email_account_get_by_email@example.com", &database)
-                .await
-                .unwrap();
-
-        assert!(result.is_some());
-        let result = result.unwrap();
-
-        assert_eq!(result.user.groups.0, vec![Group::Admin, Group::User]);
-    }
 
     #[sqlx::test(migrations = "./migrations/principal")]
     async fn test_find_by_email_with_password(pool: PgPool) {

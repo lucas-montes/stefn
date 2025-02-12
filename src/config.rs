@@ -47,7 +47,7 @@ impl SharedConfig {
             max_upload_size: 10485760,
             ips_database_url: "".into(),
             broker_url: "./test-db-broker".to_owned(),
-            database_url: "./test-db".to_owned(),
+            database_url: "postgres://lucas:secret@localhost:5432/smartlinker".to_owned(),
             worker_threads: 1,
             max_blocking_threads: 1,
             smtp_username: "smtp_username".to_owned(),

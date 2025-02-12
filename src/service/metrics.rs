@@ -6,6 +6,7 @@ use axum::{
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use std::time::Instant;
 
+#[allow(dead_code)]
 pub fn setup_metrics_recorder() -> PrometheusHandle {
     const EXPONENTIAL_SECONDS: &[f64] = &[
         0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
@@ -21,6 +22,7 @@ pub fn setup_metrics_recorder() -> PrometheusHandle {
         .unwrap()
 }
 
+#[allow(dead_code)]
 pub async fn track_metrics(req: Request, next: Next) -> impl IntoResponse {
     let start = Instant::now();
     let path = if let Some(matched_path) = req.extensions().get::<MatchedPath>() {

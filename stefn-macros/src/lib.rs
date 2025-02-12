@@ -224,7 +224,6 @@ impl FormFieldAttributes {
     }
 
     fn resolve_value(
-        &self,
         field_name: &syn::Ident,
         include_value: bool,
     ) -> proc_macro2::TokenStream {
@@ -282,7 +281,7 @@ impl FormFieldAttributes {
         let type_ = self.resolve_type();
         let name = self.resolve_name(field_name);
         let placeholder = get_default_stream(&self.placeholder);
-        let value = self.resolve_value(field_name, include_value);
+        let value = FormFieldAttributes::resolve_value(field_name, include_value);
 
         let div_class = self.resolve_div_class::<S>();
         let input_class = self.resolve_input_class::<S>();

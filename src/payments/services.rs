@@ -43,9 +43,9 @@ impl PaymentsProcessor {
         .map_err(|e| log_and_wrap_custom_internal!(e))
     }
 
-    pub async fn create_checkout_session<'a>(
+    pub async fn create_checkout_session(
         &self,
-        ui_mode: CheckoutSessionUiMode<'a>,
+        ui_mode: CheckoutSessionUiMode<'_>,
         mode: CheckoutSessionMode,
         customer: Option<String>,
         price: String,

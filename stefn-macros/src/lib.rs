@@ -2,7 +2,13 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, LitStr, Meta};
 
-/// Panics
+/// Generates the Insertable trait.
+///
+/// # Panics
+/// This function will panic if the `table_name` attribute is missing in the input tokens.
+///
+/// # Returns
+/// The resulting stream of tokens with the insertable attribute added.
 #[proc_macro_derive(Insertable, attributes(table_name))]
 pub fn add_insertable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);

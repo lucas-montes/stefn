@@ -54,9 +54,6 @@ jobs:
       - name: Rust fmt
         run: cargo fmt --all -- --check
 
-      - name: Rust clippy
-        run: cargo clippy -- -Dclippy::all -Dclippy::pedantic -D warnings
-      
       - name: Install SQLx CLI
         run: |
           cargo install sqlx-cli
@@ -85,3 +82,7 @@ jobs:
         run: cargo test --all
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/test_db
+
+      - name: Rust clippy
+        run: cargo clippy -- -Dclippy::all -Dclippy::pedantic -D warnings
+      

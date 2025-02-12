@@ -223,10 +223,7 @@ impl FormFieldAttributes {
         )
     }
 
-    fn resolve_value(
-        field_name: &syn::Ident,
-        include_value: bool,
-    ) -> proc_macro2::TokenStream {
+    fn resolve_value(field_name: &syn::Ident, include_value: bool) -> proc_macro2::TokenStream {
         if include_value {
             quote! { Some(self.#field_name.to_string()) }
         } else {

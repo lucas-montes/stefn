@@ -7,7 +7,7 @@ use crate::{
     database::Database,
     log_and_wrap_custom_internal,
     mailing::Mailer,
-    service::AppError,
+    errors::AppError,
 };
 
 #[derive(Debug)]

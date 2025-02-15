@@ -1,4 +1,4 @@
-use crate::{database::Database, service::AppError, sessions::Session, state::WebsiteState};
+use crate::{database::Database, errors::AppError, sessions::Session, state::WebsiteState};
 
 use super::{infrastructure::GoogleUserInfo, oauth::OauthTokenResponse};
 

@@ -1,14 +1,38 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
+# Enable debugging output and error handling
 set -eo pipefail
 
-while getopts m:n flag; do
+# Default values for the variables
+new_version=""
+
+# Function to display help information
+function show_help {
+  echo "Usage: $0 [-n <new_version>]"
+  echo
+  echo "Options:"
+  echo "  -n   Specify the new version of the software or application."
+  echo "  -h   Display this help message."
+  echo
+}
+
+# Parse command line arguments
+while getopts "n:h" flag; do
   case "${flag}" in
-  m) msg=${OPTARG} ;;
-  n) new_version=${OPTARG} ;;
-  *) ;;
+    n) new_version=${OPTARG} ;;
+    h) show_help; exit 0 ;;
+    *) echo "Invalid option. Use -h for help." >&2; exit 1 ;;
   esac
 done
+
+
+if [[ -z "${new_version}" ]]; then
+  echo "Error: New version (-n) is required. with the following format vX.X.X" >&2
+  exit 1
+fi
+
+echo "New Version: ${new_version}"
+
 
 update_version() {
     version="${1#v}"
@@ -20,26 +44,24 @@ update_version() {
     current_version=$(grep -oP '(?<=^version = ")[^"$]*' Cargo.toml)
 
     if [[ "$current_version" == "$version" ]]; then
-        echo "Are you sure about that? The same version? Current: $current_version New: $version"
-        exit 1
+        read -p "Are you sure about that? The current version is the same: $current_version. Do you want to proceed? (yes/no): " user_input
+        if [[ "$user_input" != "yes" && "$user_input" != "y" ]]; then
+            echo "Exiting. No changes were made."
+            exit 1
+        fi
     fi
 
     sed -i "s/^version = \".*\"$/version = \"$version\"/" Cargo.toml
-    sed -i "s/version = \".*\"/version = \"$version\"/" src/cli.rs
     echo "Let's go $version"
 }
 
-if [ $# -lt 1 ]; then
-    echo "Usage: $0 'Commit message'  'vX.X.X'"
-    exit 1
-fi
 
 cargo fmt --all
-cargo clippy --features default -- -Dclippy::all -D warnings
+cargo clippy -- -Dclippy::all -D warnings
 
 update_version "$new_version"
 
-#git add --all
-#git commit --all --signoff --message "$msg"
-#git tag -a "$version" -m "Version $version"
-#git push origin "$version"
+git add --all
+git commit --all --signoff --message "release: $new_version"
+git tag -a "$new_version" -m "Version $new_version"
+git push origin "$new_version"

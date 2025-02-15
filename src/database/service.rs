@@ -3,7 +3,7 @@ use std::{net::SocketAddr, ops::Deref, str::FromStr, sync::Arc};
 use maxminddb::geoip2;
 use sqlx::{migrate::Migrator, postgres::PgConnectOptions, PgPool, Postgres, Transaction};
 
-use crate::{log_and_wrap_custom_internal, service::AppError};
+use crate::{log_and_wrap_custom_internal, errors::AppError};
 
 #[derive(Clone, Debug)]
 pub struct Database(PgPool);

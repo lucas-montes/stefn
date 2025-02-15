@@ -10,7 +10,7 @@ use axum_extra::{
 use jsonwebtoken::decode;
 use serde::Deserialize;
 
-use crate::{service::AppError, state::APIState};
+use crate::{errors::AppError, state::APIState};
 
 use super::{dtos::JWTClaims, JWTUserRequest};
 

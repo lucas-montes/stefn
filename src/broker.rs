@@ -1,15 +1,24 @@
+use chrono::{NaiveDateTime, Utc};
 use sqlx::{
     migrate::Migrator,
     sqlite::{SqliteConnectOptions, SqliteJournalMode, SqliteSynchronous},
-    QueryBuilder, Sqlite, SqlitePool,
+    QueryBuilder, SqlitePool,
 };
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::ops::Deref;
 
-use crate::{log_and_wrap_custom_internal, service::AppError};
+use crate::errors::AppError;
 
 #[derive(Clone, Debug)]
-pub struct Broker {
-    storage: SqlitePool,
+pub struct Broker(SqlitePool);
+
+//TODO: maybe, just maybe, i should use the primary database for that
+
+impl Deref for Broker {
+    type Target = SqlitePool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl Broker {
@@ -20,16 +29,14 @@ impl Broker {
             .synchronous(SqliteSynchronous::Normal)
             .create_if_missing(true);
 
-        Self {
-            storage: SqlitePool::connect_lazy_with(events_config),
-        }
+        Self(SqlitePool::connect_lazy_with(events_config))
     }
 
     pub async fn run_migrations(&self) {
         Migrator::new(std::path::Path::new("./migrations/events"))
             .await
             .expect("Where are the migrations?")
-            .run(&self.storage)
+            .run(&**self)
             .await
             .expect("Migrations failed");
     }
@@ -42,45 +49,35 @@ impl Broker {
         self.insert_events(events).await
     }
 
-    pub fn storage(&self) -> &SqlitePool {
-        &self.storage
-    }
-
+    ///Return the number of events inserted
     async fn insert_events<S, C>(&self, events: EventFactory<S, C>) -> Result<u64, AppError>
     where
         C: Clone + sqlx::Type<sqlx::Sqlite> + sqlx::Encode<'static, sqlx::Sqlite> + 'static,
         S: Clone + sqlx::Type<sqlx::Sqlite> + sqlx::Encode<'static, sqlx::Sqlite> + 'static,
     {
-        let mut tx = self
-            .storage
-            .begin()
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        let mut tx = self.begin().await?;
 
-        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(format!(
-            "INSERT INTO {}(source, command, version, priority, created_at, payload) ",
-            events.table()
-        ));
-
-        query_builder.push_values(events, |mut b, event| {
-            b.push_bind(event.metadata.source)
-                .push_bind(event.metadata.command)
-                .push_bind(event.metadata.version)
-                .push_bind(event.priority)
-                .push_bind(event.created_at)
-                .push_bind(event.payload);
-        });
+        let mut query_builder = QueryBuilder::new("INSERT INTO ");
+        query_builder
+            .push(events.table())
+            .push(" (source, command, version, priority, created_at, payload) ")
+            .push_values(events, |mut b, event| {
+                b.push_bind(event.metadata.source)
+                    .push_bind(event.metadata.command)
+                    .push_bind(event.metadata.version)
+                    .push_bind(event.priority)
+                    .push_bind(event.created_at)
+                    .push_bind(event.payload);
+            });
+        //TODO: should I add a ; ?
 
         let result = query_builder
             .build()
             .execute(&mut *tx)
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))?
+            .await?
             .rows_affected();
 
-        tx.commit()
-            .await
-            .map_err(|e| log_and_wrap_custom_internal!(e))?;
+        tx.commit().await?;
         Ok(result)
     }
 }
@@ -112,6 +109,7 @@ where
     }
 }
 
+//TODO: do we want to clone that much?
 #[derive(Debug)]
 pub struct Event<S, C>
 where
@@ -119,7 +117,7 @@ where
     S: Clone,
 {
     metadata: EventMetadata<S, C>,
-    created_at: i64,
+    created_at: NaiveDateTime,
     priority: u8,
     payload: Vec<u8>,
 }
@@ -150,13 +148,9 @@ where
     }
 
     fn new_message(&self, payload: Vec<u8>) -> Event<S, C> {
-        let created_at = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis() as i64;
         Event {
             metadata: self.metadata.clone(),
-            created_at,
+            created_at: Utc::now().naive_utc(),
             priority: 0,
             payload,
         }

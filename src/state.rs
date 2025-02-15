@@ -1,30 +1,13 @@
-use std::{net::SocketAddr, ops::Deref};
+use std::net::SocketAddr;
 
 use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 
 use crate::{
-    auth::{create_validator, Keys},
-    broker::Broker,
-    config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig},
-    database::{Database, IpsDatabase},
-    mailing::Mailer,
-    payments::services::PaymentsProcessor,
-    service::AppError,
-    sessions::Sessions,
-    website::Locale,
+    auth::{create_validator, Keys}, broker::Broker, config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig}, database::{Database, IpsDatabase}, http::HttpClient, mailing::Mailer, payments::services::PaymentsProcessor, errors::AppError, sessions::Sessions, website::Locale
 };
 
-#[derive(Clone, Debug)]
-pub struct HttpClient(reqwest::Client);
 
-impl Deref for HttpClient {
-    type Target = reqwest::Client;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 #[derive(Clone, Debug)]
 pub struct SharedState {
@@ -58,7 +41,7 @@ impl SharedState {
         };
         Self {
             mailer,
-            http_client: HttpClient(reqwest::Client::new()),
+            http_client: HttpClient::new(),
             database: Database::new(&config.database_url),
             ips_database,
             payments_processor,
@@ -72,6 +55,10 @@ impl SharedState {
 
     pub fn events_broker(&self) -> &Broker {
         &self.events_broker
+    }
+
+    pub fn http_client(&self) -> &HttpClient {
+        &self.http_client
     }
 }
 
@@ -113,6 +100,10 @@ impl WebsiteState {
             return ips_database.get_country_code_from_ip(addr);
         }
         Err(AppError::IpDatabaseNotEnabled)
+    }
+            
+    pub fn http_client(&self) -> &HttpClient {
+        self.shared.http_client()
     }
 
     pub fn mailer(&self) -> &Mailer {

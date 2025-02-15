@@ -10,6 +10,9 @@ use crate::{
 
 use super::get_router;
 
+
+type BackgroundJob = Box<dyn Fn(Option<SharedState>) -> BoxFuture<'static, Result<(), std::io::Error>> + Send>;
+
 pub struct WebsiteService {
     config: WebsiteConfig,
     router_factory: fn(WebsiteState) -> Router<WebsiteState>,
@@ -117,7 +120,9 @@ impl Service {
     ) -> Self {
         Self::Website(WebsiteService::new(env_prefix, router_factory))
     }
-    pub fn background(task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
+    pub fn background(
+        task: fn(Option<SharedState>) -> BoxFuture<'static, Result<(), std::io::Error>>,
+    ) -> Self {
         Self::Background(BackgroundService::new(task))
     }
     pub fn router(&self) -> Option<&Router> {
@@ -159,25 +164,37 @@ impl ServiceExt for Service {
     }
 }
 
+
 pub struct BackgroundService {
-    task: Box<dyn Fn() -> BoxFuture<'static, Result<(), std::io::Error>> + Send>,
+    task: BackgroundJob,
+    state: Option<SharedState>,
 }
 
 impl BackgroundService {
-    fn new(task: fn() -> BoxFuture<'static, Result<(), std::io::Error>>) -> Self {
+    fn new(
+        task: fn(Option<SharedState>) -> BoxFuture<'static, Result<(), std::io::Error>>,
+    ) -> Self {
         Self {
             task: Box::new(task),
+            state: None,
         }
     }
 }
 
 impl ServiceExt for BackgroundService {
     fn stub(self) -> Self {
-        Self { task: self.task }
+        Self {
+            task: self.task,
+            state: Some(SharedState::stub()),
+        }
     }
 
+    async fn set_up(&mut self, _shared: SharedState) {
+        self.state = Some(_shared);
+    }
+    
     async fn run(self) -> Result<(), std::io::Error> {
-        (self.task)().await
+        (self.task)(self.state).await
     }
 }
 
@@ -208,7 +225,11 @@ pub async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
+        _ = ctrl_c => {
+        tracing::info!("shutdown gracefully from ctrl-c");
+        },
+        _ = terminate => {
+        tracing::info!("shutdown gracefully from signal");
+        },
     }
 }

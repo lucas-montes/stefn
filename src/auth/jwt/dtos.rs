@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{get_current_timestamp, DecodingKey, EncodingKey};
 use serde::{Deserialize, Serialize};
 
-use crate::service::AppError;
+use crate::errors::AppError;
 
 #[derive(Clone)]
 pub struct JWTUserRequest<T: Clone> {

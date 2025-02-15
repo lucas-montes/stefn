@@ -49,7 +49,7 @@ macro_rules! create_error_templates {
         pub fn template_to_response<T: ::askama::Template>(tmpl: &T) -> HtmlResult {
             tmpl.render()
                 .map(::axum::response::Html)
-                .map_err(::stefn::service::AppError::TemplateError)
+                .map_err(::stefn::errors::AppError::TemplateError)
                 .map_err(HtmlError::from)
         }
 
@@ -86,8 +86,8 @@ macro_rules! create_error_templates {
             }
         }
 
-        impl From<::stefn::service::AppError> for HtmlError {
-            fn from(error: ::stefn::service::AppError) -> Self {
+        impl From<::stefn::errors::AppError> for HtmlError {
+            fn from(error: ::stefn::errors::AppError) -> Self {
                 let (status, message) = error.get_status_code_and_message();
                 HtmlError(status, message)
             }

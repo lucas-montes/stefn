@@ -14,7 +14,7 @@ use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
     log_and_wrap_custom_internal,
-    service::AppError,
+    errors::AppError,
 };
 
 #[derive(Debug)]
@@ -41,6 +41,7 @@ impl OauthTokenResponse {
     }
 
     pub fn expires_in(&self) -> Option<i64> {
+        //TODO: change this shit
         self.0.expires_in().map(|d| d.as_secs() as i64)
     }
 
@@ -49,6 +50,7 @@ impl OauthTokenResponse {
         code: String,
         pkce_code: String,
     ) -> Result<Self, AppError> {
+        //TODO: callback should be an attribute of config
         let client = get_client(
             config.build_url("/callback"),
             config.google_client_id.clone(),
@@ -97,16 +99,16 @@ impl CallbackValidation {
         let csrf_state = CsrfToken::new(params_state);
 
         let query: (String, String) = sqlx::query_as(
-            r#"SELECT pkce_code_verifier, return_url FROM google_oauth_state WHERE csrf_state = $1;"#,
+            "SELECT pkce_code_verifier, return_url FROM google_oauth_state WHERE csrf_state = $1;",
         )
         .bind(csrf_state.secret())
         .fetch_one(&mut *tx)
         .await
         .map_err(|e| log_and_wrap_custom_internal!(e))?;
-        let _ = sqlx::query("DELETE FROM google_oauth_state WHERE csrf_state = $1;")
+        sqlx::query("DELETE FROM google_oauth_state WHERE csrf_state = $1;")
             .bind(csrf_state.secret())
             .execute(&mut *tx)
-            .await;
+            .await?;
 
         tx.commit()
             .await

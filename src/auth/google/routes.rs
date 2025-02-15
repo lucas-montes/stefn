@@ -4,7 +4,7 @@ use axum::{
 };
 use serde::Deserialize;
 
-use crate::{service::AppError, sessions::Session, state::WebsiteState};
+use crate::{errors::AppError, sessions::Session, state::WebsiteState};
 
 use super::{
     oauth::{CallbackValidation, OauthTokenResponse},

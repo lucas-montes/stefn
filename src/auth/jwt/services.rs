@@ -1,7 +1,7 @@
 use jsonwebtoken::{encode, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::service::AppError;
+use crate::errors::AppError;
 
 use super::dtos::JWTClaims;
 

@@ -5,7 +5,7 @@ use stripe::{
     CreateCheckoutSessionLineItems, CustomerId,
 };
 
-use crate::{log_and_wrap_custom_internal, service::AppError};
+use crate::{log_and_wrap_custom_internal, errors::AppError};
 
 #[derive(Clone)]
 pub struct PaymentsProcessor(Client);

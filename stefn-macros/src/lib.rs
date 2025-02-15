@@ -61,13 +61,13 @@ pub fn add_insertable(input: TokenStream) -> TokenStream {
             )
         }
 
-        pub async fn save<'e,  E:  ::sqlx::PgExecutor<'e>>(&self, executor: E) -> Result<i64, ::stefn::service::AppError>
+        pub async fn save<'e,  E:  ::sqlx::PgExecutor<'e>>(&self, executor: E) -> Result<i64, ::stefn::errors::AppError>
         {
             sqlx::query_scalar(&Self::insert_query())
                 #(.bind(&self.#field_names))*
                 .fetch_one(executor)
                 .await
-                .map_err(::stefn::service::AppError::from)
+                .map_err(::stefn::errors::AppError::from)
         }
             }
         };

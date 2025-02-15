@@ -19,7 +19,7 @@ use crate::{
     database::Database,
     log_and_wrap_custom_internal,
     models::{EmailAccount, Group, User, UserWithPassword},
-    service::AppError,
+    errors::AppError,
     sessions::{Session, Sessions},
     state::WebsiteState,
     website::SecureForm,

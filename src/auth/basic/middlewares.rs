@@ -9,7 +9,7 @@ use std::net::SocketAddr;
 
 use super::services::set_session_cookies;
 use crate::{
-    database::Database, models::UserSession, service::AppError, sessions::Session,
+    database::Database, models::UserSession, errors::AppError, sessions::Session,
     state::WebsiteState,
 };
 

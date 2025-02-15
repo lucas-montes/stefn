@@ -69,6 +69,7 @@ pub struct WebsiteConfig {
     pub session_cookie_name: String,
     pub session_expiration: i64,
     pub login_redirect_to: String,
+    login_path: String,
     pub csrf_cookie_name: String,
     //Note: google oauth
     pub google_client_id: String,
@@ -100,6 +101,9 @@ impl WebsiteConfig {
                 .collect()
         }
     }
+    pub fn login_path(&self) -> &str {
+        &self.login_path
+    }
 }
 
 impl ServiceConfig for WebsiteConfig {
@@ -115,6 +119,7 @@ impl ServiceConfig for WebsiteConfig {
             csrf_cookie_name: "csrf_token".into(),
             session_expiration: 30,
             login_redirect_to: "admin".into(),
+            login_path: "login".into(),
             google_client_id: "".into(),
             google_client_secret: "".into(),
             google_scopes: "scope1,scope2".into(),

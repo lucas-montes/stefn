@@ -1,7 +1,7 @@
 use std::num::ParseIntError;
 
 use axum::{
-    extract::{rejection::JsonRejection},
+    extract::rejection::JsonRejection,
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
@@ -12,7 +12,7 @@ use sqlx::error::DatabaseError;
 
 use crate::service::ErrorMessage;
 
-pub type AppResult<T> = std::result::Result<Json<T>, AppError>;
+
 
 #[derive(Debug)]
 pub enum AppError {
@@ -27,6 +27,10 @@ pub enum AppError {
     JWTModified(ParseIntError), //TODO: wrong error
     //
     TemplateError(askama::Error),
+    //
+    TooManyRequests(reqwest::Error),
+    UnauthorizedRequest(reqwest::Error),
+    RequestFailed(reqwest::Error),
     //
     DoesNotExist,
     UniqueViolation(String),
@@ -67,6 +71,10 @@ impl AppError {
 
     pub fn get_status_code_and_message(self) -> (StatusCode, String) {
         match self {
+            Self::TooManyRequests(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+            Self::UnauthorizedRequest(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+            Self::RequestFailed(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+
             Self::TemplateError(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
 
             Self::ErrorHashingPassword(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
@@ -133,6 +141,24 @@ impl From<askama::Error> for AppError {
         AppError::TemplateError(err)
     }
 }
+
+impl From<reqwest::Error> for AppError {
+    fn from(err: reqwest::Error) -> Self {
+        match err.status() {
+            Some(status) => {
+                if status == StatusCode::TOO_MANY_REQUESTS {
+                    AppError::TooManyRequests(err)
+                } else if status == StatusCode::UNAUTHORIZED {
+                    AppError::UnauthorizedRequest(err)
+                } else {
+                    AppError::RequestFailed(err)
+                }
+            }
+            None => AppError::RequestFailed(err),
+        }
+    }
+}
+
 
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> Self {

@@ -1,12 +1,10 @@
 
 use axum::{
-    extract::{ FromRequest},
-
+    extract::FromRequest,
     response::{IntoResponse, Json, Response},
 };
 
 use serde::{Deserialize, Serialize};
-use sqlx::error::DatabaseError;
 use utoipa::{ToResponse, ToSchema};
 
 use crate::errors::AppError;

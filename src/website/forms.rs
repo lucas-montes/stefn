@@ -9,7 +9,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use validator::Validate;
 
 use crate::{
-    config::WebsiteConfig, http::HttpClient, log_and_wrap_custom_internal, errors::AppError, sessions::Session
+    config::WebsiteConfig, errors::AppError, http::HttpClient, log_and_wrap_custom_internal,
+    sessions::Session,
 };
 
 #[derive(Debug, Deserialize)]

@@ -9,7 +9,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::{postgres::PgRow, prelude::FromRow, sqlite::SqliteRow, Decode, PgExecutor, Row, Type};
 
-use crate::{database::Database, log_and_wrap_custom_internal, errors::AppError};
+use crate::{database::Database, errors::AppError, log_and_wrap_custom_internal};
 
 #[derive(Type, Debug, Copy, Clone, Deserialize, Serialize, PartialEq)]
 #[repr(i64)]

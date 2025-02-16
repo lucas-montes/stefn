@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use bytes::Bytes;
 
@@ -10,19 +10,18 @@ use http::StatusCode;
 use reqwest::Url;
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
-    Body, Client, Request, Version,IntoUrl, Method, 
+    Body, Client, IntoUrl, Method, Request, Version,
 };
 use serde::Serialize;
 use serde_json::Value;
-use tokio::sync::Mutex;
 use std::fmt;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 #[derive(Default, Debug)]
 pub struct MockStore {
     responses: HashMap<String, Vec<Value>>,
 }
-
 
 pub struct RequestBuilder {
     builder: reqwest::RequestBuilder,
@@ -142,8 +141,6 @@ impl RequestBuilder {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct HttpClient {
     inner: Client,
@@ -154,7 +151,7 @@ impl HttpClient {
     pub fn new() -> Self {
         Self {
             inner: Client::new(),
-            mock_store: None
+            mock_store: None,
         }
     }
 
@@ -209,7 +206,6 @@ impl From<reqwest::Response> for Response {
 pub struct Response {
     response: reqwest::Response,
 }
-
 
 impl Response {
     pub fn new(response: reqwest::Response) -> Self {
@@ -516,5 +512,4 @@ impl Response {
     pub fn error_for_status_ref(&self) -> reqwest::Result<&Self> {
         self.response.error_for_status_ref().map(|_| self)
     }
-
 }

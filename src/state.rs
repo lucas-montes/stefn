@@ -4,10 +4,17 @@ use axum::extract::FromRef;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 
 use crate::{
-    auth::{create_validator, Keys}, broker::Broker, config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig}, database::{Database, IpsDatabase}, http::HttpClient, mailing::Mailer, payments::services::PaymentsProcessor, errors::AppError, sessions::Sessions, website::Locale
+    auth::{create_validator, Keys},
+    broker::Broker,
+    config::{APIConfig, Env, ServiceConfig, SharedConfig, WebsiteConfig},
+    database::{Database, IpsDatabase},
+    errors::AppError,
+    http::HttpClient,
+    mailing::Mailer,
+    payments::services::PaymentsProcessor,
+    sessions::Sessions,
+    website::Locale,
 };
-
-
 
 #[derive(Clone, Debug)]
 pub struct SharedState {
@@ -101,7 +108,7 @@ impl WebsiteState {
         }
         Err(AppError::IpDatabaseNotEnabled)
     }
-            
+
     pub fn http_client(&self) -> &HttpClient {
         self.shared.http_client()
     }

@@ -1,4 +1,3 @@
-
 use axum::{
     extract::FromRequest,
     response::{IntoResponse, Json, Response},
@@ -54,7 +53,7 @@ pub struct ErrorMessage {
     message: String,
 }
 
-impl ErrorMessage{
+impl ErrorMessage {
     pub fn new(message: String) -> Self {
         Self { message }
     }

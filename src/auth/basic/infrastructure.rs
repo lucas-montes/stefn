@@ -5,9 +5,9 @@ use uuid::Uuid;
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
+    errors::AppError,
     log_and_wrap_custom_internal,
     mailing::Mailer,
-    errors::AppError,
 };
 
 #[derive(Debug)]

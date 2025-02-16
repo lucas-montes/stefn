@@ -17,9 +17,9 @@ use validator::Validate;
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
+    errors::AppError,
     log_and_wrap_custom_internal,
     models::{EmailAccount, Group, User, UserWithPassword},
-    errors::AppError,
     sessions::{Session, Sessions},
     state::WebsiteState,
     website::SecureForm,

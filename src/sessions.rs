@@ -1,5 +1,5 @@
 use crate::{
-    database::Database, log_and_wrap_custom_internal, models::UserSession, errors::AppError,
+    database::Database, errors::AppError, log_and_wrap_custom_internal, models::UserSession,
 };
 use chrono::{DateTime, Days, NaiveDateTime};
 use hmac::{Hmac, Mac};

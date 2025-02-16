@@ -9,10 +9,7 @@ use maxminddb::MaxMindDBError;
 
 use sqlx::error::DatabaseError;
 
-
 use crate::service::ErrorMessage;
-
-
 
 #[derive(Debug)]
 pub enum AppError {
@@ -57,8 +54,6 @@ macro_rules! log_and_wrap_custom_internal {
         AppError::custom_internal(&$e.to_string())
     }};
 }
-
-
 
 impl AppError {
     pub fn custom_internal(message: &str) -> Self {
@@ -114,7 +109,7 @@ impl IntoResponse for AppError {
 
         let (status, message) = self.get_status_code_and_message();
 
-        (status, Json(ErrorMessage::new(message ))).into_response()
+        (status, Json(ErrorMessage::new(message))).into_response()
     }
 }
 
@@ -158,7 +153,6 @@ impl From<reqwest::Error> for AppError {
         }
     }
 }
-
 
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> Self {

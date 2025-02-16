@@ -10,8 +10,8 @@ use crate::{
 
 use super::get_router;
 
-
-type BackgroundJob = Box<dyn Fn(Option<SharedState>) -> BoxFuture<'static, Result<(), std::io::Error>> + Send>;
+type BackgroundJob =
+    Box<dyn Fn(Option<SharedState>) -> BoxFuture<'static, Result<(), std::io::Error>> + Send>;
 
 pub struct WebsiteService {
     config: WebsiteConfig,
@@ -164,7 +164,6 @@ impl ServiceExt for Service {
     }
 }
 
-
 pub struct BackgroundService {
     task: BackgroundJob,
     state: Option<SharedState>,
@@ -192,7 +191,7 @@ impl ServiceExt for BackgroundService {
     async fn set_up(&mut self, _shared: SharedState) {
         self.state = Some(_shared);
     }
-    
+
     async fn run(self) -> Result<(), std::io::Error> {
         (self.task)(self.state).await
     }

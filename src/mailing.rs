@@ -5,7 +5,7 @@ use lettre::{
     AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
 };
 
-use crate::{config::SharedConfig, log_and_wrap_custom_internal, errors::AppError};
+use crate::{config::SharedConfig, errors::AppError, log_and_wrap_custom_internal};
 
 #[derive(Clone, Debug)]
 pub struct Mailer(Arc<AsyncSmtpTransport<Tokio1Executor>>);

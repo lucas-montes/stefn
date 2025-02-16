@@ -13,8 +13,8 @@ use reqwest::Url;
 use crate::{
     config::{ServiceConfig, WebsiteConfig},
     database::Database,
-    log_and_wrap_custom_internal,
     errors::AppError,
+    log_and_wrap_custom_internal,
 };
 
 #[derive(Debug)]

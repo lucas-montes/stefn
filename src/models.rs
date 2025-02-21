@@ -191,7 +191,7 @@ impl User {
 
     pub async fn is_authenticated(&self, database: &Database) -> Result<bool, AppError> {
         sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL);",
+            "SELECT EXISTS(SELECT 1 FROM users WHERE pk = $1 AND activated_at IS NOT NULL AND deactivated_at IS NULL);",
         )
         .bind(self.pk)
         .fetch_one(&**database)

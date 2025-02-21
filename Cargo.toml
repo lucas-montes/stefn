@@ -40,9 +40,12 @@ bytes = "1.10.0"
 serde_urlencoded = "0.7"
 
 utoipa = { version = "5.3.0", features = ["axum_extras", "chrono", "decimal"] }
+jsonwebtoken = "9"
 
 askama = "0.12.1"
+validator = { version = "0.19", features = ["derive"] }
 
+sentry = "0.36.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
@@ -55,22 +58,32 @@ serde = { version = "1.0.163", features = ["derive", "rc"] }
 serde_json = "1.0.96"
 sqlx = { version = "0.8.3", features = ["sqlite", "runtime-tokio", "tls-rustls", "chrono", "uuid", "postgres"]}
 
-jsonwebtoken = "9"
+
 argon2 = "0.5.3"
 hmac = "0.12.1"
 sha2 = "0.10.8"
-hex = "0.4.3"
 oauth2 = "4.4.1"
+
+hex = "0.4.3"
+
 reqwest = { version = "0.12", features = ["json"] }
+
 maxminddb = "0.24.0"
+
 menva = "1.1.0"
+
 futures = "0.3.31"
+
 uuid = { version = "1.11.0", features = ["v7", "fast-rng", "serde"] }
+
 lettre = { version = "0.11.11", features = ["tokio1", "tokio1-native-tls"] }
+
 async-stripe = { version = "0.39.1", features = ["runtime-tokio-hyper-rustls"] }
-validator = { version = "0.19", features = ["derive"] }
+
 http-body-util = "0.1.0"
+
 unicode-normalization = "0.1.24"
+
 regex = "1.11.1"
 
 [dependencies.cookie]

@@ -82,7 +82,7 @@ macro_rules! create_error_templates {
                     _ => HtmlError::internal_error().render(),
                 };
 
-                ::axum::response::Html(template.unwrap()).into_response()
+                (self.0, ::axum::response::Html(template.unwrap())).into_response()
             }
         }
 

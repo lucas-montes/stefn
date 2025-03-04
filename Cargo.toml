@@ -46,6 +46,7 @@ askama = "0.12.1"
 validator = { version = "0.19", features = ["derive"] }
 
 sentry = "0.36.0"
+sentry-tracing = "0.36.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"

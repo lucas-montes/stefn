@@ -1,7 +1,7 @@
 use axum::http::HeaderValue;
 use menva::FromEnv;
 use oauth2::Scope;
-use std::{net::Ipv4Addr, str::FromStr};
+use std::{fmt, net::Ipv4Addr, str::FromStr};
 
 #[derive(Debug, Clone)]
 pub enum Env {
@@ -9,6 +9,17 @@ pub enum Env {
     Staging,
     Production,
     Test,
+}
+
+impl fmt::Display for Env {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Env::Development => write!(f, "Development"),
+            Env::Staging => write!(f, "Staging"),
+            Env::Production => write!(f, "Production"),
+            Env::Test => write!(f, "Test"),
+        }
+    }
 }
 
 impl FromStr for Env {
@@ -38,6 +49,26 @@ pub struct SharedConfig {
     pub smtp_password: String,
     pub smtp_relay: String,
     pub stripe_private_key: String,
+    sentry_token: String,
+}
+
+impl Default for SharedConfig {
+    fn default() -> Self {
+        Self {
+            env: Env::Development,
+            max_upload_size: 10485760,
+            ips_database_url: "sqlite://./test-db-ips.sqlite".into(),
+            broker_url: "sqlite://./test-db-broker.sqlite".into(),
+            database_url: "postgres://stefn:secret@localhost:5432/stefn".into(),
+            worker_threads: 1,
+            max_blocking_threads: 1,
+            smtp_username: "".into(),
+            smtp_password: "".into(),
+            smtp_relay: "".into(),
+            stripe_private_key: "".into(),
+            sentry_token: "".into(),
+        }
+    }
 }
 
 impl SharedConfig {
@@ -54,6 +85,15 @@ impl SharedConfig {
             smtp_password: "smtp_password".to_owned(),
             smtp_relay: "smtp_relay".to_owned(),
             stripe_private_key: "stripe_private_key".into(),
+            sentry_token: "".into(),
+        }
+    }
+
+    pub fn sentry_token(&self) -> Option<&str> {
+        if self.sentry_token.is_empty() {
+            None
+        } else {
+            Some(self.sentry_token.as_str())
         }
     }
 }

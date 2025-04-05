@@ -221,6 +221,7 @@ impl User {
     pub async fn create_active_default<'e, E: PgExecutor<'e>>(
         executor: E,
     ) -> Result<Self, AppError> {
+        //TODO: hash this
         Self::create_active("SDFddg186DFG&$dfg987qzXZCDf688sf4so34$hl#sdfj", executor).await
     }
 
@@ -275,7 +276,8 @@ impl User {
                 FROM emails
                 INNER JOIN users ON users.pk = emails.user_pk
                 LEFT JOIN users_groups_m2m ON emails.user_pk = users_groups_m2m.user_pk
-                WHERE emails.email = $1;",
+                WHERE emails.email = $1
+                GROUP BY emails.pk, users.password;",
         )
         .bind(email)
         .fetch_optional(&**database)
@@ -311,7 +313,7 @@ impl EmailAccount {
     pub async fn get_by_pk<'e, E: PgExecutor<'e>>(pk: i64, executor: E) -> Result<Self, AppError> {
         sqlx::query_as(
             "
-            SELECT emails.pk, emails.user_pk, emails.email, COALESCE(STRING_AGG(users_groups_m2m.group_pk::TEXT, ','), '') AS groups 
+            SELECT emails.pk, emails.user_pk, emails.email, COALESCE(STRING_AGG(users_groups_m2m.group_pk::TEXT, ','), '') AS groups
             FROM emails
             LEFT JOIN users_groups_m2m ON users_groups_m2m.user_pk = emails.user_pk
             WHERE emails.pk = $1
@@ -408,7 +410,7 @@ mod tests {
 
         let result = result.unwrap();
 
-        assert_eq!(result.password, "SDFdso34$hl#sdfj");
+        assert_eq!(result.password, "SDFddg186DFG&$dfg987qzXZCDf688sf4so34$hl#sdfj");
         assert_eq!(result.user.groups.0, vec![Group::User]);
     }
 

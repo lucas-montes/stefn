@@ -309,11 +309,28 @@ pub async fn set_session_cookies(
         HeaderValue::from_bytes(cookie.encoded().to_string().as_bytes())
             .map_err(|e| log_and_wrap_custom_internal!(e))?,
     );
-    //TODO: see how and where to put those
-    // headers.insert(
-    //     "Content-Security-Policy",
-    //     "default-src 'self'".parse().unwrap(),
-    // );
-    headers.insert("X-Frame-Options", "DENY".parse().unwrap());
+
+    // Security Headers:
+    // Enforce HTTPS using HSTS.
+    headers.insert(
+        "Strict-Transport-Security",
+        HeaderValue::from_static("max-age=31536000; includeSubDomains"),
+    );
+
+    // Prevent MIME type sniffing.
+    headers.insert(
+        "X-Content-Type-Options",
+        HeaderValue::from_static("nosniff"),
+    );
+
+    // Set a basic Content-Security-Policy.
+    headers.insert(
+        "Content-Security-Policy",
+        HeaderValue::from_static("frame-ancestors 'none'"),
+    );
+
+    // Existing header for framing.
+    headers.insert("X-Frame-Options", HeaderValue::from_static("DENY"));
+
     Ok(())
 }

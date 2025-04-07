@@ -10,11 +10,11 @@ macro_rules! create_view {
         #[derive(Template)]
         #[template(path =  $template_path)]
         pub struct $name<'a> {
-            meta: ::stefn::website::Meta<'a>,
+            meta: ::stefn::website::meta_tags::Meta<'a>,
         }
 
         pub async fn $fn_name<'a>() -> HtmlResult {
-            let meta = ::stefn::website::Meta {
+            let meta = ::stefn::website::meta_tags::Meta {
                 meta_title: $title.into(),
                 meta_description: $description.into(),
                 meta_keywords: $keywords.into(),
@@ -34,13 +34,13 @@ macro_rules! create_error_templates {
         #[derive(::askama::Template)]
         #[template(path = $not_found_template)]
         struct Error404<'a> {
-            meta: ::stefn::website::Meta<'a>,
+            meta: ::stefn::website::meta_tags::Meta<'a>,
         }
 
         #[derive(::askama::Template)]
         #[template(path = $internal_error_template)]
         struct Error500<'a> {
-            meta: ::stefn::website::Meta<'a>,
+            meta: ::stefn::website::meta_tags::Meta<'a>,
         }
 
         #[derive(Debug)]
@@ -57,7 +57,7 @@ macro_rules! create_error_templates {
 
         impl HtmlError {
             fn not_found<'a>() -> Error404<'a> {
-                let meta = ::stefn::website::Meta {
+                let meta = ::stefn::website::meta_tags::Meta {
                     meta_title: "Not Found".into(),
                     ..Default::default()
                 };
@@ -66,7 +66,7 @@ macro_rules! create_error_templates {
             }
 
             fn internal_error<'a>() -> Error500<'a> {
-                let meta = ::stefn::website::Meta {
+                let meta = ::stefn::website::meta_tags::Meta {
                     meta_title: "Server Error".into(),
                     ..Default::default()
                 };

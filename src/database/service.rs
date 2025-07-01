@@ -49,17 +49,17 @@ impl From<PgPool> for Database {
 
 #[derive(Clone, Debug)]
 pub struct IpsDatabase {
-    storage: Option<Arc<maxminddb::Reader<Vec<u8>>>>,
+    storage: Arc<maxminddb::Reader<Vec<u8>>>,
 }
 
 impl IpsDatabase {
     pub fn new(url: &str) -> Self {
         let storage = if url.is_empty() {
-            None
+            panic!("the ips database url is empty, please set it in the environment variables");
         } else {
-            Some(Arc::new(maxminddb::Reader::open_readfile(url).expect(
+            Arc::new(maxminddb::Reader::open_readfile(url).expect(
                 "the database for the ips seems to be missing or is the wrong path",
-            )))
+            ))
         };
         Self { storage }
     }
@@ -67,7 +67,6 @@ impl IpsDatabase {
     pub fn get_country_code_from_ip(&self, addr: &SocketAddr) -> Result<&str, AppError> {
         self.storage
             .as_ref()
-            .unwrap()
             .lookup::<geoip2::City>(addr.ip())
             .map_err(AppError::IpError)?
             .country

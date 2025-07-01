@@ -6,6 +6,7 @@ macro_rules! create_view {
         meta_keywords: $keywords:expr,
         meta_author: $author:expr,
         meta_url: $url:expr,
+        csp: $csp:expr,
     }) => {
         #[derive(Template)]
         #[template(path =  $template_path)]
@@ -20,6 +21,7 @@ macro_rules! create_view {
                 meta_keywords: $keywords.into(),
                 meta_author: $author.into(),
                 meta_url: $url.into(),
+                csp_policy: $csp,
                 ..Default::default()
             };
             let template = $name { meta };

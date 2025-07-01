@@ -24,12 +24,11 @@ impl Default for Meta<'_> {
             meta_keywords: package_name.into(),
             meta_author: authors.into(),
             meta_url: repository.into(),
-csp_policy: ContentSecurityPolicy::default(),            twitter: TwitterMetadata::default(),
+            csp_policy: ContentSecurityPolicy::default(),
+            twitter: TwitterMetadata::default(),
         }
     }
 }
-
-
 
 #[derive(Debug, Default)]
 pub struct TwitterMetadata<'a> {
@@ -40,7 +39,6 @@ pub struct TwitterMetadata<'a> {
     pub image: Cow<'a, str>,
 }
 
-
 #[derive(Debug)]
 pub struct ContentSecurityPolicy<'a> {
     pub base_uri: Cow<'a, str>,
@@ -49,7 +47,6 @@ pub struct ContentSecurityPolicy<'a> {
     pub default_src: Cow<'a, str>,
     pub font_src: Cow<'a, str>,
     pub form_action: Cow<'a, str>,
-    pub frame_ancestors: Cow<'a, str>,
     pub frame_src: Cow<'a, str>,
     pub img_src: Cow<'a, str>,
     pub manifest_src: Cow<'a, str>,
@@ -57,7 +54,6 @@ pub struct ContentSecurityPolicy<'a> {
     pub object_src: Cow<'a, str>,
     pub report_to: Cow<'a, str>,
     pub require_trusted_types_for: Cow<'a, str>,
-    pub sandbox: Cow<'a, str>,
     pub script_src: Cow<'a, str>,
     pub script_src_attr: Cow<'a, str>,
     pub script_src_elem: Cow<'a, str>,
@@ -68,6 +64,7 @@ pub struct ContentSecurityPolicy<'a> {
     pub worker_src: Cow<'a, str>,
 }
 
+//TODO: check if all the self make sense
 impl Default for ContentSecurityPolicy<'_> {
     fn default() -> Self {
         Self {
@@ -77,22 +74,20 @@ impl Default for ContentSecurityPolicy<'_> {
             default_src: "'self'".into(),
             font_src: "'self'".into(),
             form_action: "'self'".into(),
-            frame_ancestors: "'self'".into(),
             frame_src: "'self'".into(),
             img_src: "'self' ".into(),
             manifest_src: "'self'".into(),
             media_src: "'self'".into(),
             object_src: "'none'".into(),
             report_to: "default".into(),
-            require_trusted_types_for: "'none'".into(),
-            sandbox: "allow-forms allow-same-origin allow-scripts allow-popups allow-modals allow-downloads allow-presentation allow-top-navigation allow-storage-access-by-user-activation".into(),
+            require_trusted_types_for: "'script'".into(),
             script_src: "'self'".into(),
             script_src_attr: "'self'".into(),
             script_src_elem: "'self'".into(),
             style_src: "'self'".into(),
             style_src_attr: "'self'".into(),
             style_src_elem: "'self'".into(),
-            trusted_types: "default".into(),
+            trusted_types: "allow-duplicates".into(),
             worker_src: "'none'".into(),
         }
     }
@@ -107,15 +102,17 @@ impl<'a> std::fmt::Display for ContentSecurityPolicy<'a> {
         write!(f, "default-src {}; ", self.default_src)?;
         write!(f, "font-src {}; ", self.font_src)?;
         write!(f, "form-action {}; ", self.form_action)?;
-        write!(f, "frame-ancestors {}; ", self.frame_ancestors)?;
         write!(f, "frame-src {}; ", self.frame_src)?;
         write!(f, "img-src {}; ", self.img_src)?;
         write!(f, "manifest-src {}; ", self.manifest_src)?;
         write!(f, "media-src {}; ", self.media_src)?;
         write!(f, "object-src {}; ", self.object_src)?;
         write!(f, "report-to {}; ", self.report_to)?;
-        write!(f, "require-trusted-types-for {}; ", self.require_trusted_types_for)?;
-        write!(f, "sandbox {}; ", self.sandbox)?;
+        write!(
+            f,
+            "require-trusted-types-for {}; ",
+            self.require_trusted_types_for
+        )?;
         write!(f, "script-src {}; ", self.script_src)?;
         write!(f, "script-src-attr {}; ", self.script_src_attr)?;
         write!(f, "script-src-elem {}; ", self.script_src_elem)?;

@@ -13,7 +13,6 @@ use crate::{
     mailing::Mailer,
     payments::services::PaymentsProcessor,
     sessions::Sessions,
-    website::Locale,
 };
 
 #[derive(Clone, Debug)]
@@ -74,7 +73,6 @@ pub struct WebsiteState {
     secrets: WebsiteConfig,
     shared: SharedState,
     sessions: Sessions,
-    locale: Locale,
 }
 
 impl WebsiteState {
@@ -83,7 +81,6 @@ impl WebsiteState {
             sessions: Sessions::new(&secrets.sessions_db),
             shared,
             secrets,
-            locale: Locale::default(),
         }
     }
 

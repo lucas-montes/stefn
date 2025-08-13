@@ -23,7 +23,7 @@ pub enum AppError {
     JWTError(jsonwebtoken::errors::Error),
     JWTModified(ParseIntError), //TODO: wrong error
     //
-    TemplateError(askama::Error),
+    TemplateError(crate::askama::Error),
     //
     TooManyRequests(reqwest::Error),
     UnauthorizedRequest(reqwest::Error),
@@ -131,8 +131,8 @@ impl From<jsonwebtoken::errors::Error> for AppError {
     }
 }
 
-impl From<askama::Error> for AppError {
-    fn from(err: askama::Error) -> Self {
+impl From<crate::askama::Error> for AppError {
+    fn from(err: crate::askama::Error) -> Self {
         AppError::TemplateError(err)
     }
 }

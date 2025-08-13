@@ -8,7 +8,7 @@ macro_rules! create_view {
         meta_url: $url:expr,
         csp: $csp:expr,
     }) => {
-        #[derive(Template)]
+        #[derive(::stefn::askama::Template)]
         #[template(path =  $template_path)]
         pub struct $name<'a> {
             meta: ::stefn::website::meta_tags::Meta<'a>,
@@ -33,13 +33,13 @@ macro_rules! create_view {
 #[macro_export]
 macro_rules! create_error_templates {
     ($not_found_template:expr, $internal_error_template:expr) => {
-        #[derive(::askama::Template)]
+        #[derive(::stefn::askama::Template)]
         #[template(path = $not_found_template)]
         struct Error404<'a> {
             meta: ::stefn::website::meta_tags::Meta<'a>,
         }
 
-        #[derive(::askama::Template)]
+        #[derive(::stefn::askama::Template)]
         #[template(path = $internal_error_template)]
         struct Error500<'a> {
             meta: ::stefn::website::meta_tags::Meta<'a>,
@@ -48,7 +48,7 @@ macro_rules! create_error_templates {
         #[derive(Debug)]
         pub struct HtmlError(::axum::http::StatusCode, String);
 
-        pub fn template_to_response<T: ::askama::Template>(tmpl: &T) -> HtmlResult {
+        pub fn template_to_response<T: ::stefn::askama::Template>(tmpl: &T) -> HtmlResult {
             tmpl.render()
                 .map(::axum::response::Html)
                 .map_err(::stefn::errors::AppError::TemplateError)

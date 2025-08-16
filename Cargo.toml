@@ -12,16 +12,16 @@ edition.workspace = true
 edition = "2021"
 license = "Apache-2.0"
 
-[dev-dependencies]
-mockito = "1.6.1"
-
 [features]
-multipart = ["reqwest/multipart"]
-charset = ["reqwest/charset"]
-http2 = ["reqwest/http2"]
-rustls-tls = ["reqwest/rustls-tls"]
-stream = ["reqwest/stream"]
-cookies = ["reqwest/cookies"]
+api = []
+web = []
+payment = []
+email = []
+http = []
+monitoring = []
+ips = []
+broker = []
+
 
 [dependencies]
 stefn-macros = { path = "./stefn-macros", version = "0.1.0" }
@@ -39,6 +39,7 @@ bytes = "1.10.0"
 
 serde_urlencoded = "0.7"
 
+# For the API feature
 utoipa = { version = "5.3.0", features = ["axum_extras", "chrono", "decimal"] }
 jsonwebtoken = "9"
 
